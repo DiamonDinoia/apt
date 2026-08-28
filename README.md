@@ -35,13 +35,23 @@ provide, so it can never shadow Debian:
     Pin-Priority: -1
 
     Package: diamondinoia-apt act lazygit stylua galaxybudsclient ghostty
-     discord zoom clion zed watchexec difftastic lua-language-server gcc-trunk
+     discord zoom clion zed watchexec difftastic lua-language-server
     Pin: release l=diamondinoia
     Pin-Priority: 600
+
+    Package: gcc-17
+    Pin: release l=diamondinoia
+    Pin-Priority: 100
 
 The pin matches the `Release` label rather than `github.com`, so it holds
 whatever the repository is served from and never claims every package hosted on
 GitHub.
+
+The third stanza is for a package that only fills a gap until Debian fills it.
+At 100 it installs while Debian has no package of that name, and loses to
+Debian's own 500 the day Debian ships one, whatever the two versions are. A
+package left out of both lists would fall to the `-1` default and never install
+at all, so the low stanza is what makes deferring possible.
 
 The bootstrap package's version tracks the signing key. Rotating the key offers
 an upgrade that replaces the keyring, instead of leaving users with an index
@@ -65,7 +75,7 @@ command when it differs from the package name, as `difft` does.
 writes a desktop entry. One wrapping directory is stripped; set `strip = 0` or
 `strip = 2` for an archive that differs. If no `launcher` exists the install
 fails rather than leaving a tree nothing can start. A tree that ships a
-toolchain names further commands in `links` (`{ "g++-trunk" = "bin/g++" }`);
+toolchain names further commands in `links` (`{ "g++-17" = "bin/g++" }`);
 each one is checked at install so a target upstream dropped fails loudly
 instead of dangling.
 
@@ -74,7 +84,13 @@ an `asset` regex), a JSON feed (`json` plus `json_path` and `version_re`), or a
 URL that redirects to a versioned path (`url` plus `version_re`). GitHub tags
 have a leading `v` stripped. Adding `tag` reads a fixed release instead of the
 latest one; there several versions coexist as assets, so `version_re` extracts
-the version from the asset name and the greatest one is current.
+the version from the asset name and the greatest one is current. A `version_re`
+with two capture groups joins them with `~`, which makes a pre-release version
+that sorts below every real release of the same major.
+
+Add `defer_to_debian = true` for a package that carries a name Debian will
+eventually use itself. It moves out of the 600 pin into the 100 one, so Debian
+wins the moment it publishes that name.
 
 Add `icon`, `desktop_name` and `desktop_categories` for a GUI application. A
 `tree` package's `icon` is a path inside the payload; a `member` package has
@@ -115,9 +131,9 @@ The publish step uploads everything and deletes assets for versions no longer in
 the index. Only the current version of each package is served, which is all
 `apt` needs.
 
-## The exception: gcc-trunk
+## The exception: gcc-17
 
-`gcc-trunk` is Compiler Explorer's nightly build of GCC master. Compiler
+`gcc-17` is Compiler Explorer's nightly build of GCC master. Compiler
 Explorer pays for its own S3 egress, so pointing every install at their bucket
 would spend their money. GCC is GPL and may be redistributed, so `mirror.sh`
 downloads each new nightly from them exactly once and re-publishes it as an
@@ -125,10 +141,23 @@ asset of the `mirror` release here; the package pins the GitHub URL, and no
 install or test ever reaches their bucket. The exact source commit of every
 build is embedded in `gcc --version`. The newest two versions are kept.
 
-It installs to `/opt/gcc-trunk` with `gcc-trunk`, `g++-trunk` and
-`gfortran-trunk` on `PATH`, never shadowing Debian's compilers. Binaries it
-produces may need the matching runtime:
-`-Wl,-rpath,/opt/gcc-trunk/lib64` or `-static-libstdc++`.
+It installs to `/opt/gcc-17` with `gcc-17`, `g++-17` and `gfortran-17` on
+`PATH`, never shadowing Debian's default compiler. Binaries it produces may
+need the matching runtime: `-Wl,-rpath,/opt/gcc-17/lib64` or
+`-static-libstdc++`.
+
+The name and the commands are Debian's, on purpose. The version is
+`17~trunkYYYYMMDD`, and `~` sorts below everything, so this package stays below
+every version Debian could publish as `gcc-17`. Together with the pin at 100,
+Debian's real `gcc-17` replaces this one on a plain `apt upgrade` the day it
+enters the archive, and nothing has to be uninstalled by hand.
+
+The major is written into the `asset` regex rather than derived, so the spring
+GCC trunk becomes 18 the build stops with `no asset matches ...; have:
+gcc-18-trunk<date>.tar.xz`. That failure is the reminder to add a `[gcc-18]`
+block and drop this one. `mirror.sh` reads the major out of the payload's
+`lib/gcc/<target>/<version>/` path, so the name can never disagree with the
+compiler inside it.
 
 ## Signing key
 

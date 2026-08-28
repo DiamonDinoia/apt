@@ -82,7 +82,10 @@ def resolve(name: str, spec: dict) -> dict:
         # the version lives in the asset name and the greatest one is current.
         if "version_re" in spec:
             def ver(a: dict) -> str:
-                return re.search(spec["version_re"], a["name"]).group(1)
+                # Two capture groups join with `~`, which dpkg sorts below
+                # everything, so a pre-release nightly of major N stays below
+                # every version the distribution could ship as that major.
+                return "~".join(re.search(spec["version_re"], a["name"]).groups())
             asset = max(matches, key=ver)
             version = ver(asset)
         else:
@@ -311,7 +314,7 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
     shutil.rmtree(tree)
 
 
-def bootstrap(names: list[str], key: str) -> None:
+def bootstrap(specs: dict, key: str) -> None:
     """Package the keyring, the source and the pin, so adding this repository
     is one `dpkg -i` rather than three files a user has to get right by hand."""
     tree = OUT / "bootstrap-tree"
@@ -331,15 +334,24 @@ def bootstrap(names: list[str], key: str) -> None:
         f"Signed-By: /etc/apt/keyrings/{LABEL}.gpg\n"
     )
 
+    # A package that only fills a gap until the distribution fills it sits
+    # below the archive's own 500, so the archive wins by priority alone the
+    # day it ships that name. Above zero, so it still installs until then.
+    defer = [n for n, s in specs.items() if s.get("defer_to_debian")]
+    pinned = [BOOTSTRAP, *(n for n in specs if n not in defer)]
+
     # Pinned on the Release label, not the host, so the pin holds whatever the
     # repository is served from and never claims every package on github.com.
     (tree / f"etc/apt/preferences.d/{LABEL}").write_text(
         "Package: *\n"
         f"Pin: release l={LABEL}\n"
         "Pin-Priority: -1\n\n"
-        f"Package: {' '.join(names)}\n"
+        f"Package: {' '.join(pinned)}\n"
         f"Pin: release l={LABEL}\n"
         "Pin-Priority: 600\n"
+        + (f"\nPackage: {' '.join(defer)}\n"
+           f"Pin: release l={LABEL}\n"
+           "Pin-Priority: 100\n" if defer else "")
     )
 
     # The version tracks the key, so rotating it offers users an upgrade that
@@ -412,7 +424,7 @@ def main() -> int:
 
     key = os.environ.get("GPG_KEY_ID")
     if key:
-        bootstrap([BOOTSTRAP, *specs], key)
+        bootstrap(specs, key)
     index()
     for p in sorted(OUT.iterdir()):
         print(f"  {p.stat().st_size:>10,}  {p.name}")

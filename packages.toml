@@ -151,16 +151,20 @@ homepage = "https://luals.github.io"
 license = "MIT"
 section = "devel"
 
-[gcc-trunk]
+[gcc-17]
 install = "tree"
 repo = "DiamonDinoia/apt"
 tag = "mirror"
-asset = '^gcc-trunk-[0-9]{8}\.tar\.xz$'
-version_re = 'gcc-trunk-([0-9]{8})\.tar\.xz'
+# The major is pinned here on purpose. The day trunk becomes 18 no asset
+# matches and the build stops with the new name in the error, which is the
+# signal to add a [gcc-18] block and retire this one.
+asset = '^gcc-17-trunk[0-9]{8}\.tar\.xz$'
+version_re = 'gcc-(17)-(trunk[0-9]{8})\.tar\.xz'
+defer_to_debian = true
 strip = 2
 launcher = ["bin/gcc"]
-links = { "g++-trunk" = "bin/g++", "gfortran-trunk" = "bin/gfortran" }
+links = { "g++-17" = "bin/g++", "gfortran-17" = "bin/gfortran" }
 section = "devel"
 homepage = "https://gcc.gnu.org"
-description = "GCC trunk, built nightly by Compiler Explorer, mirrored here"
+description = "GCC 17 pre-release, built nightly by Compiler Explorer, mirrored here"
 license = "GPL-3.0-or-later with GCC Runtime Library Exception"
