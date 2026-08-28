@@ -150,3 +150,17 @@ description = "Language server for Lua"
 homepage = "https://luals.github.io"
 license = "MIT"
 section = "devel"
+
+[gcc-trunk]
+install = "tree"
+repo = "DiamonDinoia/apt"
+tag = "mirror"
+asset = '^gcc-trunk-[0-9]{8}\.tar\.xz$'
+version_re = 'gcc-trunk-([0-9]{8})\.tar\.xz'
+strip = 2
+launcher = ["bin/gcc"]
+links = { "g++-trunk" = "bin/g++", "gfortran-trunk" = "bin/gfortran" }
+section = "devel"
+homepage = "https://gcc.gnu.org"
+description = "GCC trunk, built nightly by Compiler Explorer, mirrored here"
+license = "GPL-3.0-or-later with GCC Runtime Library Exception"

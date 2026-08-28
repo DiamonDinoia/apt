@@ -5,10 +5,10 @@ that ship only as a GitHub release artifact under `apt` control, and replaces
 third-party repositories that either lag upstream or are run by somebody other
 than the vendor.
 
-Nothing upstream is redistributed. Every package is a few kilobytes of
-maintainer script: `postinst` downloads the file from the publisher and checks
-it against a SHA-256 pinned when the package was built. Twelve packages and the
-signed index come to 31 kB.
+Nothing upstream is redistributed, with one deliberate exception below. Every
+package is a few kilobytes of maintainer script: `postinst` downloads the file
+from the publisher and checks it against a SHA-256 pinned when the package was
+built. Thirteen packages and the signed index come to under 35 kB.
 
 That is what makes proprietary software packageable here. Discord, Zoom and
 CLion forbid redistribution, and none of their bytes pass through this
@@ -35,7 +35,7 @@ provide, so it can never shadow Debian:
     Pin-Priority: -1
 
     Package: diamondinoia-apt act lazygit stylua galaxybudsclient ghostty
-     discord zoom clion zed watchexec difftastic lua-language-server
+     discord zoom clion zed watchexec difftastic lua-language-server gcc-trunk
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
@@ -62,14 +62,19 @@ command when it differs from the package name, as `difft` does.
 
 `install = "tree"` downloads an archive, unpacks the application into
 `/opt/<name>`, symlinks the first `launcher` that exists into `/usr/bin` and
-writes a desktop entry. One wrapping directory is stripped; set `strip = 0` for
-an archive that has none. If no `launcher` exists the install fails rather than
-leaving a tree nothing can start.
+writes a desktop entry. One wrapping directory is stripped; set `strip = 0` or
+`strip = 2` for an archive that differs. If no `launcher` exists the install
+fails rather than leaving a tree nothing can start. A tree that ships a
+toolchain names further commands in `links` (`{ "g++-trunk" = "bin/g++" }`);
+each one is checked at install so a target upstream dropped fails loudly
+instead of dangling.
 
 Any shape resolves its version one of three ways: a GitHub release (`repo` plus
 an `asset` regex), a JSON feed (`json` plus `json_path` and `version_re`), or a
 URL that redirects to a versioned path (`url` plus `version_re`). GitHub tags
-have a leading `v` stripped.
+have a leading `v` stripped. Adding `tag` reads a fixed release instead of the
+latest one; there several versions coexist as assets, so `version_re` extracts
+the version from the asset name and the greatest one is current.
 
 Add `icon`, `desktop_name` and `desktop_categories` for a GUI application. A
 `tree` package's `icon` is a path inside the payload; a `member` package has
@@ -109,6 +114,21 @@ them, which downloads a few gigabytes.
 The publish step uploads everything and deletes assets for versions no longer in
 the index. Only the current version of each package is served, which is all
 `apt` needs.
+
+## The exception: gcc-trunk
+
+`gcc-trunk` is Compiler Explorer's nightly build of GCC master. Compiler
+Explorer pays for its own S3 egress, so pointing every install at their bucket
+would spend their money. GCC is GPL and may be redistributed, so `mirror.sh`
+downloads each new nightly from them exactly once and re-publishes it as an
+asset of the `mirror` release here; the package pins the GitHub URL, and no
+install or test ever reaches their bucket. The exact source commit of every
+build is embedded in `gcc --version`. The newest two versions are kept.
+
+It installs to `/opt/gcc-trunk` with `gcc-trunk`, `g++-trunk` and
+`gfortran-trunk` on `PATH`, never shadowing Debian's compilers. Binaries it
+produces may need the matching runtime:
+`-Wl,-rpath,/opt/gcc-trunk/lib64` or `-static-libstdc++`.
 
 ## Signing key
 

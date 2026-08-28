@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -62,22 +63,38 @@ def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 def resolve(name: str, spec: dict) -> dict:
     """Current version, payload URL and, where the publisher gives one, its hash."""
     if "repo" in spec:
-        with urllib.request.urlopen(
-            http(f"{API}/repos/{spec['repo']}/releases/latest")
-        ) as r:
-            release = json.load(r)
+        endpoint = (f"{API}/repos/{spec['repo']}/releases/tags/{spec['tag']}"
+                    if "tag" in spec
+                    else f"{API}/repos/{spec['repo']}/releases/latest")
+        try:
+            with urllib.request.urlopen(http(endpoint)) as r:
+                release = json.load(r)
+        except urllib.error.HTTPError as e:
+            raise SystemExit(f"{name}: {endpoint} returned {e.code}"
+                             + (f"; run mirror.sh to populate the {spec['tag']!r} "
+                                "release" if "tag" in spec else "")) from None
         rx = re.compile(spec["asset"])
-        for asset in release["assets"]:
-            if rx.match(asset["name"]):
-                digest = asset.get("digest") or ""
-                return {
-                    "version": release["tag_name"].lstrip("v"),
-                    "url": asset["browser_download_url"],
-                    "source": asset["name"],
-                    "sha256": digest.removeprefix("sha256:") or None,
-                }
-        names = ", ".join(a["name"] for a in release["assets"])
-        raise SystemExit(f"{name}: no asset matches {spec['asset']!r}; have: {names}")
+        matches = [a for a in release["assets"] if rx.match(a["name"])]
+        if not matches:
+            names = ", ".join(a["name"] for a in release["assets"])
+            raise SystemExit(f"{name}: no asset matches {spec['asset']!r}; have: {names}")
+        # A mirror release accumulates versions under one fixed tag, so there
+        # the version lives in the asset name and the greatest one is current.
+        if "version_re" in spec:
+            def ver(a: dict) -> str:
+                return re.search(spec["version_re"], a["name"]).group(1)
+            asset = max(matches, key=ver)
+            version = ver(asset)
+        else:
+            asset = matches[0]
+            version = release["tag_name"].lstrip("v")
+        digest = asset.get("digest") or ""
+        return {
+            "version": version,
+            "url": asset["browser_download_url"],
+            "source": asset["name"],
+            "sha256": digest.removeprefix("sha256:") or None,
+        }
 
     if "json" in spec:
         with urllib.request.urlopen(http(spec["json"])) as r:
@@ -163,7 +180,7 @@ done
 # An upstream that moves its launcher would otherwise leave a tree nothing can
 # start, which no later check would notice.
 [ -L /usr/bin/{name} ] || {{ echo "no launcher among: {launchers}" >&2; exit 1; }}
-""",
+{links}""",
 }
 
 PRERM = {
@@ -179,7 +196,7 @@ rm -f /usr/bin/{bin}
 """,
     "tree": """#!/bin/sh
 set -e
-rm -rf {prefix} /usr/bin/{name}
+rm -rf {prefix} /usr/bin/{name} {link_names}
 """,
 }
 
@@ -251,6 +268,14 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
         "manifest": f"/var/lib/{name}.files",
         "launchers": " ".join(spec.get("launcher", [])),
         "unpack": unpack_command(spec, info["source"], prefix),
+        # A tree that ships a toolchain needs more than one command in PATH.
+        # Every link is checked, because a target upstream dropped would
+        # otherwise become a dangling symlink no later check notices.
+        "links": "".join(
+            f'ln -sfn {prefix}/{target} /usr/bin/{link}\n'
+            f'[ -x {prefix}/{target} ] || {{ echo "missing: {target}" >&2; exit 1; }}\n'
+            for link, target in spec.get("links", {}).items()),
+        "link_names": " ".join(f"/usr/bin/{link}" for link in spec.get("links", {})),
     }
     for script, table in (("postinst", POSTINST), ("prerm", PRERM)):
         path = control / script

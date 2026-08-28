@@ -42,6 +42,13 @@ jobs:
           printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
           echo "GPG_KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5; exit}')" >> "$GITHUB_ENV"
 
+      # One download from the publisher per new version, ever; users and tests
+      # get the payload from the mirror release here.
+      - name: Mirror the gcc-trunk nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./mirror.sh
+
       - name: Build repository
         env:
           GITHUB_TOKEN: ${{ github.token }}
