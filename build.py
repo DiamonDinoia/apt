@@ -420,7 +420,13 @@ def main() -> int:
     for name, spec in specs.items():
         info = resolve(name, spec)
         print(f"{name}: {info['version']}")
-        build(name, spec, info, OUT / f"{name}_{info['version']}_{ARCH}.deb")
+        # GitHub rewrites characters it dislikes in a release asset name, and
+        # `~` becomes `.`, which leaves the index pointing at a name that 404s.
+        # The version keeps its `~`; only the file name is spelled safely.
+        deb = f"{name}_{info['version'].replace('~', '.')}_{ARCH}.deb"
+        if not re.fullmatch(r"[A-Za-z0-9._+-]+", deb):
+            raise SystemExit(f"{name}: {deb!r} has characters a release host may rewrite")
+        build(name, spec, info, OUT / deb)
 
     key = os.environ.get("GPG_KEY_ID")
     if key:

@@ -127,6 +127,13 @@ installs a package whose pinned hash is wrong and fails the run if `dpkg`
 accepts it. Give it package names to test a subset; with none it tests all of
 them, which downloads a few gigabytes.
 
+`test_gcc17.sh` runs after publishing rather than before it, because it checks
+the repository as a user meets it: it installs the bootstrap package in a
+`debian:sid` container, installs `gcc-17` from the published index, compiles and
+runs a C++ and a Fortran program, and then simulates Debian shipping its own
+`gcc-17` to confirm the handover. A rejected invalid program proves the
+successful compiles are not vacuous.
+
 The publish step uploads everything and deletes assets for versions no longer in
 the index. Only the current version of each package is served, which is all
 `apt` needs.
@@ -148,9 +155,16 @@ need the matching runtime: `-Wl,-rpath,/opt/gcc-17/lib64` or
 
 The name and the commands are Debian's, on purpose. The version is
 `17~trunkYYYYMMDD`, and `~` sorts below everything, so this package stays below
-every version Debian could publish as `gcc-17`. Together with the pin at 100,
-Debian's real `gcc-17` replaces this one on a plain `apt upgrade` the day it
-enters the archive, and nothing has to be uninstalled by hand.
+every version Debian could publish as `gcc-17`, including a pre-release upload
+numbered `17-<date>-1`. Debian's real `gcc-17` then replaces this one on a plain
+`apt upgrade` the day it enters the archive, with nothing to uninstall by hand.
+
+Both halves are needed. `apt` will not downgrade across priorities, so a higher
+pin on Debian's side does not by itself displace a nightly whose version is
+higher; the version has to sort below Debian's as well. `test_gcc17.sh` checks
+the handover in a container against a second repository standing in for Debian,
+and its control raises the pin to 600 with nothing else changed to show the pin
+is what decides.
 
 The major is written into the `asset` regex rather than derived, so the spring
 GCC trunk becomes 18 the build stops with `no asset matches ...; have:

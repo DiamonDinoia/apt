@@ -86,3 +86,11 @@ jobs:
             grep -qxF "$f" <<<"$want" ||
               { echo "delete $f"; gh release delete-asset "$RELEASE_TAG" "$f" -y; }
           done
+
+      # Everything above tests out/ on this runner. Only this step fetches the
+      # index a user fetches, which is where a name the release host rewrote
+      # turns into a 404 that nothing else can see.
+      - name: Install from the published repository and check the handover
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./test_gcc17.sh

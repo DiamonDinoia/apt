@@ -85,6 +85,22 @@ else
   echo "ok    positive control: missing payload rejected"
 fi
 
+# Check 4. Every Filename in the index has to survive the release host, which
+# rewrites a character it dislikes and leaves the index pointing at a 404. The
+# published index is never fetched here, so this is the only place that catches
+# it before users do.
+bad=$(awk '/^Filename: /{print $2}' "$repo/Packages" | grep -vE '^[A-Za-z0-9._+-]+$' || true)
+if [ -n "$bad" ]; then
+  echo "FAIL  index filenames a release host may rewrite:"; printf '  %s\n' $bad; exit 1
+fi
+echo "ok    every Filename uses characters a release host keeps"
+
+# Positive control for check 4: the pattern must reject a name that needs it.
+if grep -E '^[A-Za-z0-9._+-]+$' <<<'gcc-17_17~trunk20260828_amd64.deb' >/dev/null; then
+  echo "FAIL  positive control: the filename pattern accepted a '~' name"; exit 1
+fi
+echo "ok    positive control: a '~' filename is rejected"
+
 # Check 3. Release carries the SHA256 of Packages, so any edit must be caught.
 cp "$repo/Packages" "$work/Packages.bak"
 printf 'Package: bogus\nVersion: 1\nArchitecture: amd64\n\n' >> "$repo/Packages"
