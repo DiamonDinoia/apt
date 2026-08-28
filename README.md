@@ -91,10 +91,11 @@ into `InRelease` and `Release.gpg`.
 `test_repo.sh` runs before anything is published. It points a throwaway `apt`
 configuration at the built repository plus the host's real sources, then checks
 that every advertised package resolves at its advertised version from this
-repository and that its dependencies are satisfiable. It also confirms that
-every pinned payload URL still answers and that every pinned hash is a SHA-256.
-Two positive controls back those checks: a `Packages` mutated after `Release`
-was signed must be rejected, and a missing payload URL must fail the probe.
+repository, that every pinned payload URL still answers, and that every pinned
+hash is a SHA-256. Two positive controls back those checks: a `Packages` mutated
+after `Release` was signed must be rejected, and a missing payload URL must fail
+the probe. Dependency resolution is deliberately not simulated here, because it
+only means anything against the archive the packages target.
 
 `test_install.sh` runs the real thing in a clean `debian:sid` container. It
 installs the bootstrap package, points the source at the freshly built
