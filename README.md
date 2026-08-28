@@ -146,12 +146,33 @@ would spend their money. GCC is GPL and may be redistributed, so `mirror.sh`
 downloads each new nightly from them exactly once and re-publishes it as an
 asset of the `mirror` release here; the package pins the GitHub URL, and no
 install or test ever reaches their bucket. The exact source commit of every
-build is embedded in `gcc --version`. The newest two versions are kept.
+build is embedded in `gcc-17 --version`. The newest two versions are kept.
 
 It installs to `/opt/gcc-17` with `gcc-17`, `g++-17` and `gfortran-17` on
-`PATH`, never shadowing Debian's default compiler. Binaries it produces may
-need the matching runtime: `-Wl,-rpath,/opt/gcc-17/lib64` or
-`-static-libstdc++`.
+`PATH`, never shadowing Debian's default compiler.
+
+It depends on `libc6-dev`, the same as Debian's own `gcc-NN`: the payload
+carries a compiler, not a C library, so without the system headers it cannot
+preprocess `<cstdio>`, let alone link. Declaring that is not optional. A machine
+that happens to have `build-essential` hides the omission, which is exactly how
+it survived a green CI run.
+
+It needs nothing else. The payload bundles its own binutils, so `as`, `ld`,
+`ar`, `nm`, `objdump`, `readelf`, `strip` and `gprofng` come from
+`/opt/gcc-17/bin` and there is no dependency on Debian's `binutils`. Measured,
+not assumed: a container with `libc6-dev` and no `binutils` links and runs a
+C++ binary.
+
+Only the C, C++ and Fortran drivers are put on `PATH`. The payload also carries
+`gccgo`, `gdc`, `gnat`, `gm2`, `gcobol`, `gccrs` and `ga68`, along with
+`lto-dump` and `gcov`, none of them symlinked. Call them by their path under
+`/opt/gcc-17/bin`, or add them to `links` in `packages.toml`.
+
+Binaries it produces may need the matching runtime, because that lives in the
+payload rather than in Debian. Either pass `-Wl,-rpath,/opt/gcc-17/lib64` or
+link the runtime statically with `-static-libstdc++`. `test_gcc17.sh` compiles
+and runs a C++ program the static way and a Fortran program the rpath way, so
+both forms in this paragraph are checked rather than assumed.
 
 The name and the commands are Debian's, on purpose. The version is
 `17~trunkYYYYMMDD`, and `~` sorts below everything, so this package stays below
@@ -166,12 +187,27 @@ the handover in a container against a second repository standing in for Debian,
 and its control raises the pin to 600 with nothing else changed to show the pin
 is what decides.
 
-The major is written into the `asset` regex rather than derived, so the spring
-GCC trunk becomes 18 the build stops with `no asset matches ...; have:
-gcc-18-trunk<date>.tar.xz`. That failure is the reminder to add a `[gcc-18]`
-block and drop this one. `mirror.sh` reads the major out of the payload's
-`lib/gcc/<target>/<version>/` path, so the name can never disagree with the
-compiler inside it.
+### Moving to gcc-18
+
+The bump is deliberately manual, once per GCC release cycle. The major is
+written into the `asset` regex rather than derived from the payload, so the
+spring that trunk becomes 18, the nightly stops with
+
+    gcc-17: no asset matches '^gcc-17-trunk[0-9]{8}\.tar\.xz$'; have: gcc-18-trunk20270415.tar.xz
+
+That failure names the new major and is the whole reminder mechanism. To act on
+it, rename the `[gcc-17]` block to `[gcc-18]` and change `17` to `18` in
+`asset`, `version_re` and `links`. Nothing else moves.
+
+Deriving the name from the payload instead would be automatic but wrong in two
+ways. A package that renames itself has no upgrade path in `apt`, so anyone
+holding the old name would silently stop receiving updates. And publishing GCC
+18 under the name `gcc-17` would leave Debian's real `gcc-17`, when it arrives,
+looking like the newer version of a compiler it is older than.
+
+The failure is loud rather than silent because `mirror.sh` reads the major out
+of the payload's `lib/gcc/<target>/<version>/` path and puts it in the asset
+name, so the name can never disagree with the compiler inside it.
 
 ## Signing key
 

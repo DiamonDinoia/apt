@@ -161,6 +161,9 @@ tag = "mirror"
 asset = '^gcc-17-trunk[0-9]{8}\.tar\.xz$'
 version_re = 'gcc-(17)-(trunk[0-9]{8})\.tar\.xz'
 defer_to_debian = true
+# A compiler without the C library headers cannot compile anything, and
+# Debian's own gcc-NN depends on libc6-dev for the same reason.
+depends = "libc6, libc6-dev"
 strip = 2
 launcher = ["bin/gcc"]
 links = { "g++-17" = "bin/g++", "gfortran-17" = "bin/gfortran" }

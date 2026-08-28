@@ -23,7 +23,11 @@ ok()   { echo "  ok   $*"; }
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get -qq update
-apt-get -qq install -y curl ca-certificates dpkg-dev python3-minimal >/dev/null
+# --no-install-recommends on purpose: dpkg-dev recommends build-essential, and
+# letting that in would install libc6-dev behind the package's back, so the
+# compile below would pass whether or not gcc-17 declares what it needs.
+apt-get -qq install -y --no-install-recommends \
+    curl ca-certificates dpkg-dev python3-minimal >/dev/null
 
 echo "== bootstrap package installs the key, the source and the pin"
 curl -fsSL "$boot" -o /tmp/boot.deb
