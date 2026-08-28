@@ -1,0 +1,152 @@
+# Package sources for the nightly build.
+#
+# Every entry produces an installer package: a few kilobytes of maintainer
+# script that downloads the payload from the publisher and checks it against a
+# SHA-256 pinned at build time. Nothing upstream is redistributed.
+#
+# install = "deb"     download a .deb and unpack it into /
+# install = "member"  download an archive and place one executable in /usr/bin
+# install = "tree"    download an archive and place the application in /opt
+#
+# The version comes from the publisher: a GitHub release tag with a leading "v"
+# stripped, a version_re applied to a JSON feed, or a version_re applied to the
+# path a plain URL redirects to.
+
+[act]
+install = "member"
+repo = "nektos/act"
+asset = '^act_Linux_x86_64\.tar\.gz$'
+member = "act"
+description = "Run GitHub Actions locally"
+homepage = "https://github.com/nektos/act"
+license = "MIT"
+
+[lazygit]
+install = "member"
+repo = "jesseduffield/lazygit"
+asset = '^lazygit_[0-9.]+_linux_x86_64\.tar\.gz$'
+member = "lazygit"
+description = "Terminal UI for git commands"
+homepage = "https://github.com/jesseduffield/lazygit"
+license = "MIT"
+
+[stylua]
+install = "member"
+repo = "JohnnyMorganz/StyLua"
+asset = '^stylua-linux-x86_64\.zip$'
+member = "stylua"
+description = "Opinionated Lua code formatter"
+homepage = "https://github.com/JohnnyMorganz/StyLua"
+license = "MPL-2.0"
+
+[galaxybudsclient]
+install = "member"
+repo = "timschneeb/GalaxyBudsClient"
+asset = '^GalaxyBudsClient_linux-amd64_portable\.zip$'
+member = "GalaxyBudsClient"
+description = "Unofficial manager for Samsung Galaxy Buds"
+homepage = "https://github.com/timschneeb/GalaxyBudsClient"
+license = "GPL-3.0"
+depends = "libc6, libstdc++6, libgcc-s1, libx11-6, libfontconfig1, bluez"
+desktop_name = "Galaxy Buds Client"
+desktop_categories = "Audio;AudioVideo;Settings;"
+icon = "audio-headset"
+
+# Replaces deb-free.griffo.io, which holds every release for two months. The
+# .deb fetched here is the same file deb.griffo.io serves behind its paywall.
+[ghostty]
+install = "deb"
+repo = "dariogriffo/ghostty-debian"
+asset = '^ghostty_[0-9.]+-[0-9]+\.forky_amd64\.deb$'
+description = "GPU-accelerated terminal emulator"
+homepage = "https://ghostty.org"
+license = "MIT"
+
+# Replaces palfrey.github.io/discord-apt with Discord's own build.
+[discord]
+install = "deb"
+url = "https://discord.com/api/download?platform=linux&format=deb"
+version_re = 'discord-([0-9.]+)\.deb'
+description = "Voice and text chat client"
+homepage = "https://discord.com"
+license = "Proprietary, Discord Terms of Service"
+
+# Replaces mirror.mwt.me with Zoom's own build.
+[zoom]
+install = "deb"
+url = "https://zoom.us/client/latest/zoom_amd64.deb"
+version_re = 'prod/([0-9.]+)/zoom_amd64\.deb'
+description = "Video conferencing client"
+homepage = "https://zoom.us"
+license = "Proprietary, Zoom Terms of Service"
+
+# Replaces the unofficial jetbrains-ppa S3 bucket, which serves an IDE over
+# plain HTTP. The tarball comes from JetBrains' own release feed, which also
+# publishes the SHA-256 that the postinst checks.
+[clion]
+install = "tree"
+json = "https://data.services.jetbrains.com/products/releases?code=CL&latest=true&type=release"
+json_path = "CL.0.downloads.linux"
+version_re = 'CLion-([0-9.]+)\.tar\.gz'
+launcher = ["bin/clion", "bin/clion.sh"]
+icon = "bin/clion.svg"
+description = "JetBrains C and C++ IDE"
+homepage = "https://www.jetbrains.com/clion/"
+license = "Proprietary, JetBrains Toolbox Subscription Agreement"
+section = "devel"
+depends = "libc6, libxext6, libxrender1, libxtst6, libxi6, libfreetype6, libfontconfig1"
+desktop_name = "CLion"
+desktop_categories = "Development;IDE;"
+wm_class = "jetbrains-clion"
+
+# Replaces the hand-unpacked tree in ~/.local/zed.app, which only zed's own
+# updater could refresh, and the 1.8.2 that deb-free.griffo.io still serves.
+[zed]
+install = "tree"
+repo = "zed-industries/zed"
+asset = '^zed-linux-x86_64\.tar\.gz$'
+launcher = ["bin/zed"]
+icon = "share/icons/hicolor/512x512/apps/zed.png"
+description = "Multiplayer code editor"
+homepage = "https://zed.dev"
+license = "GPL-3.0 and Apache-2.0"
+section = "editors"
+depends = "libc6, libasound2t64, libfontconfig1, libwayland-client0, libxkbcommon0"
+desktop_name = "Zed"
+desktop_categories = "Development;IDE;TextEditor;"
+wm_class = "dev.zed.Zed"
+
+# Replaces `cargo install watchexec-cli`, which has no update path. Upstream
+# ships a real .deb, so its own control metadata is kept.
+[watchexec]
+install = "deb"
+repo = "watchexec/watchexec"
+asset = '^watchexec-[0-9.]+-x86_64-unknown-linux-gnu\.deb$'
+description = "Run commands when files change"
+homepage = "https://watchexec.github.io"
+license = "Apache-2.0"
+
+# Replaces `cargo install difftastic`. The binary is named difft, not the
+# package name, so the launcher is placed under its own name.
+[difftastic]
+install = "member"
+repo = "Wilfred/difftastic"
+asset = '^difft-x86_64-unknown-linux-gnu\.tar\.gz$'
+member = "difft"
+binary = "difft"
+description = "Structural diff that understands syntax"
+homepage = "https://difftastic.wilfred.me.uk"
+license = "MIT"
+
+# Replaces the hand-unpacked tree in ~/.local/share/lua-language-server. The
+# tarball has no wrapping directory, so nothing is stripped.
+[lua-language-server]
+install = "tree"
+repo = "LuaLS/lua-language-server"
+asset = '^lua-language-server-[0-9.]+-linux-x64\.tar\.gz$'
+strip = 0
+launcher = ["bin/lua-language-server"]
+description = "Language server for Lua"
+homepage = "https://luals.github.io"
+license = "MIT"
+section = "devel"
