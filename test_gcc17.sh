@@ -97,7 +97,10 @@ stub() {
         > /srv/deb/pkg/DEBIAN/control
     rm -f /srv/deb/*.deb
     dpkg-deb --root-owner-group --build /srv/deb/pkg "/srv/deb/gcc-17_$1_amd64.deb" >/dev/null
-    ( cd /srv/deb && dpkg-scanpackages --multiversion . /dev/null > Packages 2>/dev/null )
+    # A compressed index too, or apt logs six warnings per update for the
+    # variants it cannot find, which buries the evidence this check produces.
+    ( cd /srv/deb && dpkg-scanpackages --multiversion . /dev/null > Packages 2>/dev/null
+      gzip -kf Packages )
     echo 'deb [trusted=yes] file:///srv/deb ./' > /etc/apt/sources.list.d/stand-in.list
     apt-get -qq update
 }

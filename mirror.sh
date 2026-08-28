@@ -29,7 +29,11 @@ listing=$(curl -fsS "$bucket/?list-type=2&prefix=opt/gcc-trunk-")
 grep -F '<IsTruncated>true' <<<"$listing" >/dev/null &&
     { echo "FAIL  S3 listing truncated; paginate before trusting it"; exit 1; }
 
-latest=$(grep -oE 'gcc-trunk-[0-9]{8}\.tar\.xz' <<<"$listing" | sort -u | tail -1)
+# The listing is one long line, so it is split on the tag before matching.
+# tr and sed both exit 0 on no match, which lets an empty listing reach the
+# diagnostic below rather than aborting on grep's exit status under pipefail.
+latest=$(tr '<' '\n' <<<"$listing" |
+         sed -nE 's|^Key>opt/(gcc-trunk-[0-9]{8}\.tar\.xz)$|\1|p' | sort -u | tail -1)
 [ -n "$latest" ] || { echo "FAIL  no gcc-trunk tarball in the listing"; exit 1; }
 date=${latest//[!0-9]/}
 
