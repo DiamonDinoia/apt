@@ -72,18 +72,28 @@ else
 fi
 
 # Keep the newest few, so an install that resolved the previous nightly a moment
-# ago still finds its payload. Assets under the pre-rename name are dropped
-# outright: nothing resolves them any more.
-gh release view mirror --repo "$repo" --json assets -q '.assets[].name' |
-    grep -E '^gcc-trunk-[0-9]{8}\.tar\.xz$' |
-while read -r old; do
-    gh release delete-asset mirror "$old" --repo "$repo" -y
-    echo "dropped pre-rename $old"
+# ago still finds its payload. Filtering happens in bash rather than through a
+# `grep` in a pipeline: with `pipefail`, a `grep` that correctly matches nothing
+# fails the whole script, and silencing that with `|| true` would also hide a
+# real error from `gh`.
+mapfile -t assets < <(gh release view mirror --repo "$repo" --json assets -q '.assets[].name')
+
+drop=()
+dated=()
+for a in "${assets[@]}"; do
+    if [[ $a =~ ^gcc-trunk-[0-9]{8}\.tar\.xz$ ]]; then
+        drop+=("$a")                        # pre-rename; nothing resolves it
+    elif [[ $a =~ ^gcc-[0-9]+-trunk([0-9]{8})\.tar\.xz$ ]]; then
+        dated+=("${BASH_REMATCH[1]} $a")
+    fi
 done
 
-gh release view mirror --repo "$repo" --json assets -q '.assets[].name' |
-    grep -E '^gcc-[0-9]+-trunk[0-9]{8}\.tar\.xz$' | sort -t- -k3 | head -n "-$keep" |
-while read -r old; do
+if [ "${#dated[@]}" -gt "$keep" ]; then
+    mapfile -t sorted < <(printf '%s\n' "${dated[@]}" | sort)
+    for ((i = 0; i < ${#sorted[@]} - keep; i++)); do drop+=("${sorted[i]#* }"); done
+fi
+
+for old in ${drop[@]+"${drop[@]}"}; do
     gh release delete-asset mirror "$old" --repo "$repo" -y
     echo "pruned $old"
 done

@@ -89,7 +89,7 @@ fi
 # rewrites a character it dislikes and leaves the index pointing at a 404. The
 # published index is never fetched here, so this is the only place that catches
 # it before users do.
-bad=$(awk '/^Filename: /{print $2}' "$repo/Packages" | grep -vE '^[A-Za-z0-9._+-]+$' || true)
+bad=$(awk '/^Filename: /{ if ($2 !~ /^[A-Za-z0-9._+-]+$/) print $2 }' "$repo/Packages")
 if [ -n "$bad" ]; then
   echo "FAIL  index filenames a release host may rewrite:"; printf '  %s\n' $bad; exit 1
 fi

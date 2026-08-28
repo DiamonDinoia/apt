@@ -53,7 +53,7 @@ done
 ok "gcc-17, g++-17 and gfortran-17 are on PATH"
 
 echo "== the compiler reports the major the package is named for"
-gcc-17 --version | head -1
+gcc-17 --version | sed -n 1p
 dv=$(gcc-17 -dumpversion)
 [[ $dv == 17.* ]] || fail "gcc-17 -dumpversion is $dv, not 17.x"
 ok "-dumpversion is $(gcc-17 -dumpversion)"
@@ -78,9 +78,10 @@ program p
   print '(I0)', sum([(i, i=1,100)])
 end program p
 F90
-gfortran-17 -O2 -o /tmp/tf /tmp/t.f90 || fail "gfortran-17 could not compile"
+gfortran-17 -O2 -Wl,-rpath,/opt/gcc-17/lib64 -o /tmp/tf /tmp/t.f90 ||
+    fail "gfortran-17 could not compile"
 [ "$(/tmp/tf)" = 5050 ] || fail "fortran program printed '$(/tmp/tf)'"
-ok "gfortran-17 compiles and the binary prints 5050"
+ok "gfortran-17 with the documented -Wl,-rpath compiles and prints 5050"
 
 echo "== control: a program that must not compile does not"
 echo 'int main(){ return undefined_symbol_xyz(); }' > /tmp/bad.c
@@ -97,7 +98,7 @@ stub() {
     rm -f /srv/deb/*.deb
     dpkg-deb --root-owner-group --build /srv/deb/pkg "/srv/deb/gcc-17_$1_amd64.deb" >/dev/null
     ( cd /srv/deb && dpkg-scanpackages --multiversion . /dev/null > Packages 2>/dev/null )
-    echo 'deb [trusted=yes] file:/srv/deb ./' > /etc/apt/sources.list.d/stand-in.list
+    echo 'deb [trusted=yes] file:///srv/deb ./' > /etc/apt/sources.list.d/stand-in.list
     apt-get -qq update
 }
 
