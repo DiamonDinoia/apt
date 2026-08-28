@@ -40,7 +40,9 @@ fi
 fail=0
 while read -r pkg ver; do
   # Check 1. The version table must bind the advertised version to this repo.
-  if ! apt-cache "${apt[@]}" policy "$pkg" | grep -A5 -F " $ver " | grep -qF "$repo"; then
+  # grep without -q: -q exits on the first match and SIGPIPEs whatever feeds
+  # it, which pipefail then reports as a failed pipeline despite the match.
+  if ! apt-cache "${apt[@]}" policy "$pkg" | grep -A5 -F " $ver " | grep -F "$repo" >/dev/null; then
     printf 'FAIL  %-18s %s not offered by this repository\n' "$pkg" "$ver"
     fail=1
     continue
@@ -88,7 +90,7 @@ cp "$repo/Packages" "$work/Packages.bak"
 printf 'Package: bogus\nVersion: 1\nArchitecture: amd64\n\n' >> "$repo/Packages"
 rm -rf "$work/lists"; mkdir -p "$work/lists/partial"
 if apt-get "${apt[@]}" update -qq 2>/dev/null &&
-   apt-cache "${apt[@]}" policy bogus | grep -q 'Candidate: 1'; then
+   apt-cache "${apt[@]}" policy bogus | grep -F 'Candidate: 1' >/dev/null; then
   echo "FAIL  positive control: apt accepted a mutated Packages index"
   fail=1
 else

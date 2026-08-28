@@ -50,7 +50,7 @@ apt-get update -qq
 apt-get install -y --no-install-recommends /repo/diamondinoia-apt_*.deb
 
 test -s /etc/apt/keyrings/diamondinoia.gpg
-grep -q '^Pin-Priority: 600' /etc/apt/preferences.d/diamondinoia
+grep '^Pin-Priority: 600' /etc/apt/preferences.d/diamondinoia >/dev/null
 sed -i 's|^URIs: .*|URIs: file:///repo/|' /etc/apt/sources.list.d/diamondinoia.sources
 
 apt-get update -qq
@@ -58,7 +58,7 @@ apt-get install -y --no-install-recommends $WANT
 
 rc=0
 for pkg in $WANT; do
-    if ! dpkg-query -W -f '${Status}' "$pkg" | grep -q 'install ok installed'; then
+    if ! dpkg-query -W -f '${Status}' "$pkg" | grep -F 'install ok installed' >/dev/null; then
         printf 'FAIL  %-18s not configured\n' "$pkg"; rc=1; continue
     fi
     # What the package claims to install is read back out of its own postinst,
