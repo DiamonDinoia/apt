@@ -61,7 +61,10 @@ jobs:
       - name: Free runner disk
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
 
-      - name: Install every package in a clean Debian sid container
+      # One container per package, so a dependency one package declares cannot
+      # stand in for another that forgot to. Peak disk is one package, not all
+      # of them, because each container is removed before the next starts.
+      - name: Install each package alone in a clean Debian sid container
         run: ./test_install.sh
 
       - name: Drop payloads for versions no longer referenced
