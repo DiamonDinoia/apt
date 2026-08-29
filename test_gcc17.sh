@@ -96,6 +96,31 @@ for c in gcc-17 $links; do
 done
 ok "gcc-17 and all $(wc -w <<<"$links") linked tools run"
 
+# Every executable the payload ships is either linked onto PATH or excluded for
+# a stated reason, so a front end a future payload adds fails here instead of
+# going unnoticed. Excluded: the bundled binutils and gprofng, which the driver
+# finds itself and which Debian's gcc-NN does not put on PATH either; the
+# x86_64-linux-gnu-* aliases of drivers already linked, which Debian does not
+# ship for the native compiler; c++, which has no -NN spelling in Debian; and
+# go and gofmt, which cannot start. Every link is <tool>-17 -> bin/<tool>.
+skip='^(x86_64-linux-gnu-.*|go|gofmt|c\+\+|addr2line|ar|as|c\+\+filt|elfedit'
+skip+='|gp-.*|gprof|gprofng.*|ld|ld\.bfd|nm|objcopy|objdump|ranlib|readelf'
+skip+='|size|strings|strip)$'
+linked=$(for l in gcc-17 $links; do printf '%s\n' "${l%-17}"; done | sort)
+present=$(for b in /opt/gcc-17/bin/*; do n=${b##*/}
+              [[ $n =~ $skip ]] || printf '%s\n' "$n"; done | sort)
+extra=$(comm -13 <(printf '%s\n' "$linked") <(printf '%s\n' "$present"))
+[ -z "$extra" ] || fail "the payload ships tools that are neither linked nor
+    excluded, so packages.toml is behind it:$(printf '\n  %s' $extra)"
+ok "all $(wc -l <<<"$present") tools in the payload are linked or excluded"
+
+# Control: a name the payload does not ship must come out of the same
+# comparison, or an empty result above means only that the comparison is broken.
+[ "$(comm -13 <(printf '%s\n' "$linked") \
+              <(printf '%s\n' "$present" ; echo zz-new-frontend))" = zz-new-frontend ] ||
+    fail "control: an unlinked tool did not show up, so the check above is blind"
+ok "control: an unlinked tool is reported"
+
 # A tool that starts is not a tool that links. libgcobol.so needs libxml2, which
 # no --version call touches, so gcobol-17 died at link time in a container that
 # had only what this package declares. Every payload library and every linked

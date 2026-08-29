@@ -187,7 +187,10 @@ distribution takes the name over:
 
 The list comes from `packages.toml`, and `test_gcc17.sh` reads it from there
 and runs every entry, so a tool a future payload drops fails CI rather than
-becoming a dangling symlink. Beyond starting them it compiles and runs a
+becoming a dangling symlink. The reverse direction is checked too: the 73
+executables in the payload's `bin` are 28 linked ones plus 45 excluded for a
+stated reason, and a name in neither set fails the test, so a front end a
+future payload adds cannot go unnoticed. Beyond starting them it compiles and runs a
 program in each language that can be compiled today, C, C++, Fortran, Ada, D,
 Modula-2, Go and COBOL, each summing 1 to 100. `gccrs` still answers `gccrs is
 not yet able to compile Rust code properly`, so it and `ga68` are started but
