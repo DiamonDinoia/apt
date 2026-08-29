@@ -157,4 +157,25 @@ else
   echo "ok    positive control: an unmoved version does not satisfy gt"
 fi
 
+# Check 6: the README names every linked tool, so the list a reader copies from
+# has to be the list the package installs. Docs drift silently; a diff does not.
+# A table the regex fails to find reads as empty and reports all 28 names as
+# missing, so a broken parse cannot pass as agreement.
+if python3 - <<'DOC'; then
+import re, sys, tomllib
+links = tomllib.load(open("packages.toml", "rb"))["gcc-17"]["links"]
+table = re.search(r"\n    gcc-17 .*?\n\n", open("README.md").read(), re.S)
+listed = set(re.findall(r"\b[a-z+0-9-]+-17\b", table.group(0))) if table else set()
+want = set(links) | {"gcc-17"}
+for name in sorted(listed - want):
+    print(f"      the README lists {name}, which packages.toml does not link")
+for name in sorted(want - listed):
+    print(f"      packages.toml links {name}, which the README does not list")
+sys.exit(listed != want)
+DOC
+  echo "ok    the README table names exactly the $(($(grep -c '" = "bin/' packages.toml) + 1)) linked tools"
+else
+  echo "FAIL  the README table and packages.toml disagree"; fail=1
+fi
+
 exit $fail
