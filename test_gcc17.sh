@@ -116,9 +116,11 @@ stub 17.1.0-1
 apt-cache policy gcc-17
 [ "$(apt-cache policy gcc-17 | sed -n 's/^ *Candidate: //p')" = 17.1.0-1 ] ||
     fail "the distribution package did not become the candidate"
-grep '^Inst gcc-17 .*17\.1\.0-1' <<<"$(apt-get -s upgrade)" >/dev/null ||
-    fail "a plain upgrade does not hand gcc-17 over"
-ok "apt upgrade replaces $mine with 17.1.0-1, no manual step"
+for cmd in upgrade dist-upgrade; do
+  grep '^Inst gcc-17 .*17\.1\.0-1' <<<"$(apt-get -s $cmd)" >/dev/null ||
+    fail "apt-get $cmd does not hand gcc-17 over"
+done
+ok "apt upgrade and dist-upgrade both replace $mine with 17.1.0-1"
 
 echo "-- control: raise the pin to 600 and nothing else, ours must win again"
 # Same two repositories, same two versions. Only the pin differs, so the pin is
