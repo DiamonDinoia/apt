@@ -114,7 +114,12 @@ rc=$?
 
 for pkg in $want; do
   echo "==> $pkg"
-  "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" debian:sid \
+  # From packages.toml rather than from the postinst, so a link the build drops
+  # fails here, before publication, instead of only in test_gcc17.sh after it.
+  links=$(python3 -c "import tomllib
+spec = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))['$pkg']
+print(' '.join(spec.get('links', {})))")
+  "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" -e "LINKS=$links" debian:sid \
       bash -eo pipefail -s <<'SCRIPT'
 apt-get update -qq
 apt-get install -y --no-install-recommends /repo/diamondinoia-apt_*.deb
@@ -165,6 +170,16 @@ for pkg in $WANT; do
     else
         printf 'FAIL  %-18s installed nothing\n' "$pkg"; rc=1; continue
     fi
+    # Every link the package declares has to resolve to something that can run.
+    for l in $LINKS; do
+        t=$(readlink -f "/usr/bin/$l" 2>/dev/null) || t=
+        if [ ! -x "$t" ]; then
+            printf 'FAIL  %-18s link /usr/bin/%s resolves to nothing runnable\n' \
+                "$pkg" "$l"; rc=1; continue 2
+        fi
+    done
+    [ -z "$LINKS" ] || what="$what, $(wc -w <<<"$LINKS") links"
+
     printf 'ok    %-18s %s\n' "$pkg" "$what"
 done
 

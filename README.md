@@ -163,9 +163,15 @@ It also depends on `libxml2`, which the nine `libgcobol` objects link against.
 Nothing in `gcobol-17 --version` touches it, so the omission only appeared when
 a container with no `libxml2` tried to link a COBOL program and `ld` reported
 `undefined reference to xmlCtxtGetLastError@LIBXML2_2.6.0`. `test_gcc17.sh` now
-runs `ldd` over every library in the payload and every linked tool, and fails on
-anything reported `not found`; the unlinked `go` and `gofmt` are its positive
-control, because both are known to be unresolvable.
+runs `ldd` over every executable and every shared object under `/opt/gcc-17`
+and fails on anything reported `not found`.
+
+Six files are the exception, and they are the test's positive control: `go`,
+`gofmt` and the four binaries `gccgo` runs for cgo, `buildid`, `cgo`,
+`test2json` and `vet`, are built against the payload's own `libgo.so.25` with
+no rpath to it. They are permanently unresolvable, so the sweep asserts it
+still finds exactly six. The practical consequence is that `gccgo-17` compiles
+pure Go, which the test checks, but not Go that imports `"C"`.
 
 It needs nothing else. The payload bundles its own binutils, so `as`, `ld`,
 `ar`, `nm`, `objdump`, `readelf`, `strip` and `gprofng` come from
@@ -196,12 +202,18 @@ Modula-2, Go and COBOL, each summing 1 to 100. `gccrs` still answers `gccrs is
 not yet able to compile Rust code properly`, so it and `ga68` are started but
 not exercised.
 
-Two commands are deliberately not linked. `go` and `gofmt` are Go programs
-built against the payload's own `libgo`, so they exit 127 with `error while
-loading shared libraries` unless the loader is pointed at `/opt/gcc-17/lib64`,
-and this package sets no loader path. The bundled binutils are not linked
-either: the driver finds them itself, and Debian's `gcc-NN` does not put them
-in `PATH` either.
+The 45 that are not linked fall into four classes. 27 are the bundled binutils
+and gprofng: the driver finds them itself, and `dpkg -L` shows Debian's
+`gcc-13` through `gcc-16` put none of them in `PATH` either. 15 are
+`x86_64-linux-gnu-` aliases of drivers already linked; the payload spells them
+without a version, so linking them would have to invent
+`x86_64-linux-gnu-gcc-17`, a name no current Debian `gcc-NN` ships. `gcc-12`
+did ship eight such names; `gcc-13` onwards ship none, so following the current
+convention means leaving them out. One is `c++`, which Debian gives no `-NN`
+spelling. The last two are `go` and `gofmt`, Go programs built against the
+payload's own `libgo`, which exit 127 with `error while loading shared
+libraries` unless the loader is pointed at `/opt/gcc-17/lib64`, and this
+package sets no loader path.
 
 Binaries it produces may need the matching runtime, because that lives in the
 payload rather than in Debian. Either pass `-Wl,-rpath,/opt/gcc-17/lib64` or

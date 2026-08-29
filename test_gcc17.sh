@@ -15,15 +15,19 @@ boot=$(gh release view repo --repo "$repo" --json assets \
 [ -n "$boot" ] || { echo "FAIL  no bootstrap package in the repo release"; exit 1; }
 echo "bootstrap: $boot"
 
-# The link names come from packages.toml, so the test cannot drift from the
-# package: a tool added there is a tool checked here.
-links=$(python3 -c "import tomllib, sys
-print(' '.join(tomllib.load(open('packages.toml', 'rb'))['gcc-17']['links']))")
+# The links come from packages.toml, so the test cannot drift from the package:
+# a tool added there is a tool checked here. Names and targets are read
+# separately because the checks below need both and must not assume the one can
+# be derived from the other.
+IFS=$'\t' read -r links targets < <(python3 -c "import tomllib
+spec = tomllib.load(open('packages.toml', 'rb'))['gcc-17']['links']
+print(' '.join(spec) + chr(9) + ' '.join(t.split('/')[-1] for t in spec.values()))")
 
-"$engine" run --rm -i debian:sid bash -s "$boot" "$links" <<'INNER'
+"$engine" run --rm -i debian:sid bash -s "$boot" "$links" "$targets" <<'INNER'
 set -euo pipefail
 boot=$1
 links=$2
+targets=$3
 fail() { echo "FAIL  $*"; exit 1; }
 ok()   { echo "  ok   $*"; }
 
@@ -99,14 +103,15 @@ ok "gcc-17 and all $(wc -w <<<"$links") linked tools run"
 # Every executable the payload ships is either linked onto PATH or excluded for
 # a stated reason, so a front end a future payload adds fails here instead of
 # going unnoticed. Excluded: the bundled binutils and gprofng, which the driver
-# finds itself and which Debian's gcc-NN does not put on PATH either; the
-# x86_64-linux-gnu-* aliases of drivers already linked, which Debian does not
-# ship for the native compiler; c++, which has no -NN spelling in Debian; and
-# go and gofmt, which cannot start. Every link is <tool>-17 -> bin/<tool>.
+# finds itself and which Debian's gcc-13 through gcc-16 do not put on PATH
+# either; the x86_64-linux-gnu-* aliases, which carry no version suffix in the
+# payload, so linking them would invent a name no current Debian gcc-NN ships
+# (gcc-12 shipped eight of them, gcc-13 onwards ship none); c++, which has no
+# -NN spelling in Debian; and go and gofmt, which cannot start.
 skip='^(x86_64-linux-gnu-.*|go|gofmt|c\+\+|addr2line|ar|as|c\+\+filt|elfedit'
 skip+='|gp-.*|gprof|gprofng.*|ld|ld\.bfd|nm|objcopy|objdump|ranlib|readelf'
 skip+='|size|strings|strip)$'
-linked=$(for l in gcc-17 $links; do printf '%s\n' "${l%-17}"; done | sort)
+linked=$(printf '%s\n' gcc $targets | sort)
 present=$(for b in /opt/gcc-17/bin/*; do n=${b##*/}
               [[ $n =~ $skip ]] || printf '%s\n' "$n"; done | sort)
 extra=$(comm -13 <(printf '%s\n' "$linked") <(printf '%s\n' "$present"))
@@ -122,29 +127,34 @@ ok "all $(wc -l <<<"$present") tools in the payload are linked or excluded"
 ok "control: an unlinked tool is reported"
 
 # A tool that starts is not a tool that links. libgcobol.so needs libxml2, which
-# no --version call touches, so gcobol-17 died at link time in a container that
-# had only what this package declares. Every payload library and every linked
-# tool has to resolve against those declarations alone.
+# no --version call touches, so gcobol-17 died at link time in a container
+# holding only what this package declares. The sweep therefore covers the whole
+# payload: libexec holds the binaries gccgo invokes for cgo, and nothing on
+# PATH would have shown them.
 unresolved() {          # libraries $1 needs that the container cannot supply
     local out
     # ldd answers non-zero for a script or a static object, which is a normal
-    # answer here, so the verdict is the text it prints, not its exit status.
+    # answer over a tree of mixed files, so the verdict is the text it prints.
     out=$(ldd "$1" 2>/dev/null) || out=
-    printf '%s\n' "$out" | awk -v f="${1##*/}" '/not found/{ print f, $1 }'
+    printf '%s\n' "$out" | awk -v f="${1#/opt/gcc-17/}" '/not found/{ print f, $1 }'
 }
-missing=$(for f in /opt/gcc-17/lib64/*.so*; do unresolved "$f"; done
-          for c in $links; do unresolved "$(readlink -f "/usr/bin/$c")"; done)
-[ -z "$missing" ] || fail "unresolved shared libraries:$(printf '\n  %s' $missing)"
-ok "every payload library and every linked tool resolves"
+missing=$(find /opt/gcc-17 -type f \( -perm -u+x -o -name '*.so*' \) |
+          while read -r f; do unresolved "$f"; done)
 
-# Control for the sweep above: go and gofmt are Go programs with no rpath to
-# the payload's libgo, which is exactly why neither is linked onto PATH. A
-# sweep that cannot see those two cannot see anything.
-for c in go gofmt; do
-    [ -n "$(unresolved /opt/gcc-17/bin/$c)" ] ||
-        fail "control: $c resolves, so the sweep above proves nothing"
-done
-ok "control: the unlinked go and gofmt are seen as unresolvable"
+# One class is accepted: go, gofmt and the four binaries gccgo runs for cgo are
+# built against the payload's own libgo with no rpath to it. None is linked onto
+# PATH and cgo does not work. Everything else has to resolve against what this
+# package declares.
+other=$(grep -v ' libgo\.so\.25$' <<<"$missing") || other=
+[ -z "$other" ] || fail "unresolved shared libraries:$(printf '\n  %s' $other)"
+ok "every payload object resolves apart from the Go helpers"
+
+# Control: those Go helpers are permanently unresolvable, so a sweep that stops
+# reporting them has stopped working. It runs on the same find and the same
+# loop as the check above, not on a separate call.
+n=$(grep -c ' libgo\.so\.25$' <<<"$missing") || n=0
+[ "$n" -eq 6 ] || fail "control: the sweep reported $n Go helpers, expected 6"
+ok "control: the sweep still reports all $n unresolvable Go helpers"
 
 echo "== the compiler reports the major the package is named for"
 gcc-17 --version | sed -n 1p
