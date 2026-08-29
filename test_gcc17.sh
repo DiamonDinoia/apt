@@ -31,7 +31,37 @@ apt-get -qq install -y --no-install-recommends \
 
 echo "== bootstrap package installs the key, the source and the pin"
 curl -fsSL "$boot" -o /tmp/boot.deb
-apt-get -qq install -y /tmp/boot.deb >/dev/null
+
+# The route a user is on: an older bootstrap already installed, reached only by
+# `apt upgrade`. Installing /tmp/boot.deb by path skips version comparison, so
+# it cannot see a republished package that kept its version, which is exactly
+# how a corrected pin once reached nobody. The stand-in for that older package
+# is this one with the gcc-17 stanza taken out and the serial dropped to 0.
+new_v=$(dpkg-deb -f /tmp/boot.deb Version)
+dpkg-deb -R /tmp/boot.deb /tmp/stale
+python3 - <<'STALE'
+import re, pathlib
+pin = pathlib.Path("/tmp/stale/etc/apt/preferences.d/diamondinoia")
+pin.write_text(re.sub(r"\nPackage: gcc-17\n[^\n]*\nPin-Priority: 100\n", "", pin.read_text()))
+ctl = pathlib.Path("/tmp/stale/DEBIAN/control")
+ctl.write_text(re.sub(r"^Version: 1\.\d+", "Version: 1.0", ctl.read_text(), flags=re.M))
+STALE
+dpkg-deb --build /tmp/stale /tmp/stale.deb >/dev/null
+apt-get -qq install -y /tmp/stale.deb >/dev/null
+apt-get -qq update
+
+# Reproduce the reported failure first, or the upgrade below proves nothing.
+stale_cand=$(apt-cache policy gcc-17 | sed -n 's/^ *Candidate: //p')
+[ "$stale_cand" = "(none)" ] ||
+    fail "the stale pin should leave gcc-17 with no candidate, got '$stale_cand'"
+ok "control: the stale pin leaves gcc-17 uninstallable"
+
+apt-get -qq install -y --only-upgrade diamondinoia-apt >/dev/null
+have=$(dpkg-query -W -f '${Version}' diamondinoia-apt)
+[ "$have" = "$new_v" ] ||
+    fail "apt upgrade left diamondinoia-apt at $have, not $new_v"
+ok "apt upgrade moves the bootstrap 1.0 -> $new_v"
+apt-get -qq update
 # Every check below reads a captured string rather than piping into `grep -q`.
 # Under `pipefail` a `grep -q` that exits on the first match sends SIGPIPE to
 # the producer, and the pipeline then reports 141 even though the match was
