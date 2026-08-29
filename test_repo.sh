@@ -8,6 +8,9 @@
 # Check 3 (positive control): mutating Packages after Release was written must
 #          make apt reject the repository. Without it the checks above cannot be
 #          told apart from apt quietly ignoring an index it never read.
+# Check 4: every Filename in the index survives the release host unrewritten.
+# Check 5: the bootstrap package changes version whenever the files it installs
+#          change, because apt offers no upgrade at a version it already holds.
 #
 # Dependency resolution is not checked here. It only means anything against the
 # archive the packages target, and test_install.sh proves it by installing them
@@ -113,5 +116,45 @@ else
   echo "ok    positive control: mutated index rejected"
 fi
 cp "$work/Packages.bak" "$repo/Packages"
+
+# Check 5. The bootstrap package carries the pin, and a pin only reaches an
+# existing installation through an upgrade. Compare what this build produces
+# against what is published: same files must keep the version, different files
+# must raise it. build.py decides this from the same pair, so the comparison is
+# repeated here from the published artifact rather than trusted.
+boot=$(cd "$repo" && echo diamondinoia-apt_*_all.deb)
+new_v=${boot#diamondinoia-apt_}; new_v=${new_v%_all.deb}
+url=https://github.com/DiamonDinoia/apt/releases/download/repo
+old_b=$(curl -fsSL "$url/Packages" |
+        awk '/^Filename: diamondinoia-apt_/{ print $2 }')
+if [ -z "$old_b" ]; then
+  echo "FAIL  the published index advertises no bootstrap package"; fail=1
+else
+  old_v=${old_b#diamondinoia-apt_}; old_v=${old_v%_all.deb}
+  curl -fsSL -o "$work/old.deb" "$url/$old_b"
+  dpkg-deb -x "$work/old.deb" "$work/old"
+  dpkg-deb -x "$repo/$boot" "$work/new"
+  # Different files must raise the version, or the change reaches nobody. An
+  # unchanged rebuild may still raise it, because build.py holds a floor under
+  # serials that were published twice with different contents.
+  if diff -r "$work/old" "$work/new" >/dev/null; then
+    want=ge; why="the files are identical"
+  else
+    want=gt; why="the files differ"
+  fi
+  if dpkg --compare-versions "$new_v" "$want" "$old_v"; then
+    echo "ok    bootstrap $old_v -> $new_v, $why"
+  else
+    echo "FAIL  bootstrap $old_v -> $new_v, but $why so it must be $want"; fail=1
+  fi
+fi
+
+# Positive control for check 5: an unchanged version must fail the gt arm, which
+# is exactly the case that shipped a stale pin nobody could receive.
+if dpkg --compare-versions "$new_v" gt "$new_v"; then
+  echo "FAIL  positive control: dpkg called a version greater than itself"; fail=1
+else
+  echo "ok    positive control: an unmoved version does not satisfy gt"
+fi
 
 exit $fail

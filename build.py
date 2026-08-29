@@ -31,6 +31,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 import urllib.error
 import urllib.request
@@ -43,6 +44,10 @@ ARCH = "amd64"
 MAINTAINER = "Marco Barbone <mbarbone@flatironinstitute.org>"
 API = "https://api.github.com"
 BOOTSTRAP = "diamondinoia-apt"
+SELF = "DiamonDinoia/apt"
+# Two different pin files were both published as 1.0, so no machine that
+# installed 1.0 can be told which one it holds. That serial is burnt.
+FLOOR = 1
 BASE_URI = "https://github.com/DiamonDinoia/apt/releases/download/repo/"
 LABEL = "diamondinoia"
 
@@ -314,6 +319,38 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
     shutil.rmtree(tree)
 
 
+def bootstrap_version(tree: Path, key: str) -> str:
+    """The version of the bootstrap package, bumped when its files change.
+
+    Apt offers no upgrade at a version it already holds, so a pin file edited
+    without a bump reaches nobody who installed earlier. Comparing against the
+    published package is what decides, because nothing else in the build knows
+    whether this rebuild changed anything. The serial leads the version: a
+    rotated key sorts below the key it replaces as often as above it.
+    """
+    def payload(root: Path) -> dict[str, bytes]:
+        return {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*")
+                if p.is_file() and p.relative_to(root).parts[0] != "DEBIAN"}
+
+    rx = re.compile(rf"{BOOTSTRAP}_1\.(\d+)\+[0-9a-f]+_all\.deb")
+    try:
+        with urllib.request.urlopen(http(f"{API}/repos/{SELF}/releases/tags/repo")) as r:
+            assets = [a for a in json.load(r)["assets"] if rx.fullmatch(a["name"])]
+    except urllib.error.HTTPError:
+        assets = []            # nothing published yet, so this is the first version
+    if not assets:
+        return f"1.{FLOOR}+{key[-8:].lower()}"
+
+    old = max(assets, key=lambda a: int(rx.fullmatch(a["name"])[1]))
+    with tempfile.TemporaryDirectory() as d:
+        with urllib.request.urlopen(http(old["browser_download_url"])) as r:
+            Path(d, "old.deb").write_bytes(r.read())
+        run(["dpkg-deb", "-x", f"{d}/old.deb", f"{d}/x"])
+        changed = payload(Path(d, "x")) != payload(tree)
+    serial = int(rx.fullmatch(old["name"])[1]) + changed
+    return f"1.{max(serial, FLOOR)}+{key[-8:].lower()}"
+
+
 def bootstrap(specs: dict, key: str) -> None:
     """Package the keyring, the source and the pin, so adding this repository
     is one `dpkg -i` rather than three files a user has to get right by hand."""
@@ -354,9 +391,7 @@ def bootstrap(specs: dict, key: str) -> None:
            "Pin-Priority: 100\n" if defer else "")
     )
 
-    # The version tracks the key, so rotating it offers users an upgrade that
-    # replaces the keyring rather than leaving them unable to verify the index.
-    version = f"1.0+{key[-8:].lower()}"
+    version = bootstrap_version(tree, key)
     (tree / "DEBIAN/control").write_text(
         f"Package: {BOOTSTRAP}\n"
         f"Version: {version}\n"
