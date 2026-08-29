@@ -55,15 +55,30 @@ defer=$(awk '/^\[/{ p=substr($0, 2, length($0) - 2) }
              /^defer_to_debian *= *true/{ printf "%s ", p }' \
         "$(dirname "$0")/packages.toml")
 
-# The hosts of the third-party sources the bootstrap package carries, so the
-# check below follows packages.toml rather than listing eight names again.
-hosts=$(python3 -c "import tomllib, re
-repos = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))['repos']
-print(' '.join(re.sub(r'https?://([^/]+).*', r'\1', r['uris'].split()[0])
-                for r in repos.values() if not r.get('separate')))")
+# apt names a list file after the URI, with '_' escaped as %5f and '/' turned
+# into '_', and inserts dists/<suite> for anything that is not a flat
+# repository. Naming every file a source must produce catches a source that
+# quietly loses one of its suites, which llvm has five of; grepping for the
+# host cannot tell one suite from five.
+indices() {           # $1: one repo name, or empty for every carried source
+    python3 -c "import tomllib, re, sys
+want = sys.argv[1]
+out = []
+for name, r in tomllib.load(open('$root/packages.toml', 'rb'))['repos'].items():
+    if not ((name == want) if want else not r.get('separate')):
+        continue
+    for uri in r['uris'].split():
+        path = re.sub(r'^https?://', '', uri).rstrip('/')
+        path = path.replace('_', '%5f').replace('/', '_')
+        for suite in r['suites'].split():
+            out.append(path + ('_InRelease' if suite == '/'
+                               else f'_dists_{suite}_InRelease'))
+print(' '.join(out))" "$1"
+}
 
 echo "==> repository checks"
-"$engine" run --rm -i -v "$repo:/repo:ro" -e "DEFER=$defer" -e "HOSTS=$hosts" debian:sid \
+"$engine" run --rm -i -v "$repo:/repo:ro" -e "DEFER=$defer" \
+    -e "INDICES=$(indices '')" debian:sid \
     bash -eo pipefail -s <<'SCRIPT'
 rc=0
 apt-get update -qq
@@ -84,17 +99,19 @@ sed -i 's|^URIs: .*|URIs: file:///repo/|' /etc/apt/sources.list.d/diamondinoia.s
 # what turns apt's warning into a failure. The list file is the evidence that
 # the source was fetched, not merely that the update as a whole survived.
 apt-get update -qq -o APT::Update::Error-Mode=any
-for h in $HOSTS; do
-    if ls /var/lib/apt/lists/ | grep -q "^$h"; then
-        echo "ok    $h verifies against the shipped key"
+for f in $INDICES; do
+    if [ -s "/var/lib/apt/lists/$f" ]; then
+        echo "ok    ${f%_InRelease} verifies against the shipped key"
     else
-        echo "FAIL  no index fetched from $h"; rc=1
+        echo "FAIL  no index at /var/lib/apt/lists/$f"; rc=1
     fi
 done
 
-# Positive control for the loop above, on one host rather than all eight: the
-# same strict update has to reject a source whose key is noise. tailscale is
-# the cheapest to refetch. A loop that only ever sees good keys proves nothing.
+# Positive control for the loop above, on one source rather than all of them:
+# the same strict update has to reject a source whose key is noise. tailscale
+# is the cheapest to refetch. A loop that only ever sees good keys proves
+# nothing. The key is restored and the source refetched, so the container is
+# left in the state the checks after this one expect.
 cp /etc/apt/keyrings/tailscale.gpg /tmp/key.bak
 head -c 64 /dev/urandom > /etc/apt/keyrings/tailscale.gpg
 rm -f /var/lib/apt/lists/pkgs.tailscale.com*
@@ -104,6 +121,7 @@ else
     echo "ok    positive control: a corrupt key is refused"
 fi
 cp /tmp/key.bak /etc/apt/keyrings/tailscale.gpg
+apt-get update -qq -o APT::Update::Error-Mode=any
 
 # A package that defers to the distribution has to sit in the 100 stanza. At
 # 600 it outranks the archive and the handover never happens; named in neither
@@ -158,7 +176,8 @@ for pkg in $want; do
   links=$(python3 -c "import tomllib
 spec = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))
 print(' '.join(spec.get('$pkg', {}).get('links', {})))")
-  "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" -e "LINKS=$links" debian:sid \
+  "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" -e "LINKS=$links" \
+      -e "INDICES=$(indices "${pkg#diamondinoia-repo-}")" debian:sid \
       bash -eo pipefail -s <<'SCRIPT'
 apt-get update -qq
 apt-get install -y --no-install-recommends /repo/diamondinoia-apt_*.deb
@@ -208,26 +227,25 @@ for pkg in $WANT; do
             printf 'FAIL  %-18s apt-get update rejects the source it added\n' "$pkg"
             rc=1; continue
         fi
-        host=$(sed -n 's|^URIs: ||p' "$src" | awk '{ print $1 }' |
-               sed -E 's|https?://||; s|/.*||')
-        if ! ls /var/lib/apt/lists/ | grep -q "^$host"; then
-            printf 'FAIL  %-18s no index fetched from %s\n' "$pkg" "$host"
-            rc=1; continue
-        fi
+        for f in $INDICES; do
+            [ -s "/var/lib/apt/lists/$f" ] && continue
+            printf 'FAIL  %-18s no index at /var/lib/apt/lists/%s\n' "$pkg" "$f"
+            rc=1
+        done
         # Positive control: with the shipped key replaced by noise, the same
-        # strict update has to reject this source. Only this source's list
-        # files are dropped, so apt refetches it and nothing else. Without the
-        # control a green run cannot be told from a check that verifies
-        # nothing, which is what a stale InRelease in the cache would give.
+        # strict update has to reject this source. Only this source's index is
+        # dropped, so apt refetches it and nothing else. Without the control a
+        # green run cannot be told from a check that verifies nothing, which is
+        # what a stale InRelease in the cache would give.
         cp "$key" /tmp/key.bak
         head -c 64 /dev/urandom > "$key"
-        rm -f /var/lib/apt/lists/"$host"*
+        for f in $INDICES; do rm -f "/var/lib/apt/lists/$f"; done
         if apt-get update -qq -o APT::Update::Error-Mode=any >/dev/null 2>&1; then
             printf 'FAIL  %-18s positive control: a corrupt key verified anyway\n' "$pkg"
             rc=1
         fi
         cp /tmp/key.bak "$key"
-        what="$host verified with $(basename "$key"), corrupt key refused"
+        what="${INDICES%%_*} verified with $(basename "$key"), corrupt key refused"
     elif [ -d "/opt/$pkg" ]; then
         # A tree is only usable if the launcher symlink resolves into it.
         target=$(readlink -f "/usr/bin/$pkg" 2>/dev/null)

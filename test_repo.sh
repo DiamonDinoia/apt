@@ -223,4 +223,28 @@ else
   echo "FAIL  the README pin and the built pin disagree"; fail=1
 fi
 
+# Check 9: the README names the sources the bootstrap package carries, and a
+# reader who installs on that promise has to get them. The vscode source was
+# on the machine and in neither, so the list is exactly the kind of thing that
+# is wrong without anyone noticing.
+if python3 - <<'DOC'; then
+import re, sys, tomllib
+repos = tomllib.load(open("packages.toml", "rb"))["repos"]
+want = {n for n, r in repos.items() if not r.get("separate")}
+block = re.search(r"with the keys\nthat verify them:\n\n((?:    .*\n)+)",
+                  open("README.md").read())
+listed = set(block.group(1).split()) if block else set()
+for n in sorted(listed - want):
+    print(f"      the README names {n}, which packages.toml does not carry")
+for n in sorted(want - listed):
+    print(f"      packages.toml carries {n}, which the README does not name")
+sys.exit(not listed or listed != want)
+DOC
+  echo "ok    the README names the $(python3 -c "import tomllib
+r = tomllib.load(open('packages.toml','rb'))['repos']
+print(sum(1 for v in r.values() if not v.get('separate')))") carried sources"
+else
+  echo "FAIL  the README and packages.toml disagree on the carried sources"; fail=1
+fi
+
 exit $fail

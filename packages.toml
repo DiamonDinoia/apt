@@ -272,6 +272,14 @@ components = "main"
 key = "https://pkgs.tailscale.com/stable/debian/sid.noarmor.gpg"
 key_sha256 = "3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39"
 
+[repos.vscode]
+uris = "https://packages.microsoft.com/repos/code"
+suites = "stable"
+components = "main"
+architectures = "amd64"
+key = "https://packages.microsoft.com/keys/microsoft.asc"
+key_sha256 = "2fa9c05d591a1582a9aba276272478c262e95ad00acf60eaee1644d93941e3c6"
+
 [repos.yazi]
 uris = "https://yazi-rs.github.io/builds/"
 suites = "stable"

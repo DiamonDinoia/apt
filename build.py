@@ -340,8 +340,10 @@ def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
     try:
         with urllib.request.urlopen(http(f"{API}/repos/{SELF}/releases/tags/repo")) as r:
             assets = [a for a in json.load(r)["assets"] if rx.fullmatch(a["name"])]
-    except urllib.error.HTTPError:
-        assets = []            # nothing published yet, so this is the first version
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise              # a 503 read as "nothing published" resets the serial
+        assets = []            # no release yet, so this is the first version
     if not assets:
         return f"1.{floor}+{suffix}"
 
@@ -384,6 +386,18 @@ def add_repo(tree: Path, name: str, spec: dict) -> None:
         "".join(f"{k}: {v}\n" for k, v in fields.items()))
 
 
+def conffiles(tree: Path) -> None:
+    """Declare everything under /etc a configuration file, as policy requires.
+
+    Without this dpkg overwrites a source the user edited on every upgrade, and
+    `apt remove` on the bootstrap deletes the third-party sources and keys it
+    carries. Conffiles survive removal and go only on purge.
+    """
+    paths = sorted(f"/{p.relative_to(tree)}" for p in (tree / "etc").rglob("*")
+                   if p.is_file())
+    (tree / "DEBIAN/conffiles").write_text("".join(f"{p}\n" for p in paths))
+
+
 def repo_package(name: str, spec: dict) -> None:
     """Build diamondinoia-repo-<name>: one third-party source, nothing else.
 
@@ -398,6 +412,7 @@ def repo_package(name: str, spec: dict) -> None:
         (tree / d).mkdir(parents=True)
     add_repo(tree, name, spec)
 
+    conffiles(tree)
     version = content_version(pkg, tree, spec["key_sha256"][:8])
     (tree / "DEBIAN/control").write_text(
         f"Package: {pkg}\n"
@@ -468,6 +483,7 @@ def bootstrap(specs: dict, repos: dict, key: str) -> None:
            "Pin-Priority: 100\n" if defer else "")
     )
 
+    conffiles(tree)
     version = content_version(BOOTSTRAP, tree, key[-8:].lower(), FLOOR)
     (tree / "DEBIAN/control").write_text(
         f"Package: {BOOTSTRAP}\n"

@@ -53,10 +53,13 @@ GitHub.
 
 ## Other people's repositories
 
-The bootstrap package also installs eight third-party apt sources with the keys
-that verify them: brave, github-cli, google-cloud-cli, llvm,
-nvidia-container-toolkit, onlyoffice, tailscale and yazi. A machine that wants
-this repository at all wants a current llvm and `gh`.
+The bootstrap package also installs these third-party apt sources with the keys
+that verify them:
+
+    brave  github-cli  google-cloud-cli  llvm  nvidia-container-toolkit
+    onlyoffice  tailscale  vscode  yazi
+
+A machine that wants this repository at all wants a current llvm and `gh`.
 
 Two are hardware, so they are packages of their own and install nothing else:
 
@@ -66,7 +69,16 @@ Two are hardware, so they are packages of their own and install nothing else:
 Every key is fetched while the package is built, checked against a SHA-256 in
 `packages.toml`, and written into the package. A vendor that rotates or
 replaces a key fails the build rather than the install, and no install needs
-network before apt runs.
+network before apt runs. The files land in `/etc`, so they are conffiles: an
+edit survives an upgrade, and removing the package leaves them until purge.
+
+`diamondinoia-repo-cuda` points at NVIDIA's `debian13` repository. The
+`debian12` one cannot be used on Debian 13 or later at all: its key
+`A4B469963BF863CC` self-certifies with SHA-1, which sequoia's `sqv` has
+rejected since 2026-02-01, so every `apt-get update` fails on it. A machine
+that already has that source needs it taken away by hand:
+
+    sudo rm /etc/apt/sources.list.d/cuda-debian12-x86_64.sources
 
 The third stanza is for a package that only fills a gap until Debian fills it.
 At 100 it installs while Debian has no package of that name, and loses to
