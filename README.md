@@ -34,8 +34,9 @@ provide, so it can never shadow Debian:
     Pin: release l=diamondinoia
     Pin-Priority: -1
 
-    Package: diamondinoia-apt act lazygit stylua galaxybudsclient ghostty
-     discord zoom clion zed watchexec difftastic lua-language-server
+    Package: diamondinoia-apt diamondinoia-repo-cuda diamondinoia-repo-juno act
+     lazygit stylua galaxybudsclient ghostty discord zoom clion zed watchexec
+     difftastic lua-language-server
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
@@ -46,6 +47,23 @@ provide, so it can never shadow Debian:
 The pin matches the `Release` label rather than `github.com`, so it holds
 whatever the repository is served from and never claims every package hosted on
 GitHub.
+
+## Other people's repositories
+
+The bootstrap package also installs eight third-party apt sources with the keys
+that verify them: brave, github-cli, google-cloud-cli, llvm,
+nvidia-container-toolkit, onlyoffice, tailscale and yazi. A machine that wants
+this repository at all wants a current llvm and `gh`.
+
+Two are hardware, so they are packages of their own and install nothing else:
+
+    sudo apt-get install diamondinoia-repo-cuda    # NVIDIA CUDA
+    sudo apt-get install diamondinoia-repo-juno    # Juno Computers
+
+Every key is fetched while the package is built, checked against a SHA-256 in
+`packages.toml`, and written into the package. A vendor that rotates or
+replaces a key fails the build rather than the install, and no install needs
+network before apt runs.
 
 The third stanza is for a package that only fills a gap until Debian fills it.
 At 100 it installs while Debian has no package of that name, and loses to

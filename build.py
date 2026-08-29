@@ -18,7 +18,11 @@ publisher publishes beside the payload. Only when neither exists is the payload
 downloaded, hashed and discarded.
 
 One further package, diamondinoia-apt, carries the signing key, the source entry
-and the pin, so adding this repository is a single install.
+and the pin, so adding this repository is a single install. It also carries the
+third-party sources listed under [repos] in packages.toml, each with its vendor
+key pinned by SHA-256; the ones marked `separate` become a
+diamondinoia-repo-<name> package instead, for repositories only the machine
+with the matching hardware wants.
 """
 
 from __future__ import annotations
@@ -319,8 +323,8 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
     shutil.rmtree(tree)
 
 
-def bootstrap_version(tree: Path, key: str) -> str:
-    """The version of the bootstrap package, bumped when its files change.
+def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
+    """The version of a configuration package, bumped when its files change.
 
     Apt offers no upgrade at a version it already holds, so a pin file edited
     without a bump reaches nobody who installed earlier. Comparing against the
@@ -332,14 +336,14 @@ def bootstrap_version(tree: Path, key: str) -> str:
         return {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*")
                 if p.is_file() and p.relative_to(root).parts[0] != "DEBIAN"}
 
-    rx = re.compile(rf"{BOOTSTRAP}_1\.(\d+)\+[0-9a-f]+_all\.deb")
+    rx = re.compile(rf"{pkg}_1\.(\d+)\+[0-9a-f]+_all\.deb")
     try:
         with urllib.request.urlopen(http(f"{API}/repos/{SELF}/releases/tags/repo")) as r:
             assets = [a for a in json.load(r)["assets"] if rx.fullmatch(a["name"])]
     except urllib.error.HTTPError:
         assets = []            # nothing published yet, so this is the first version
     if not assets:
-        return f"1.{FLOOR}+{key[-8:].lower()}"
+        return f"1.{floor}+{suffix}"
 
     old = max(assets, key=lambda a: int(rx.fullmatch(a["name"])[1]))
     with tempfile.TemporaryDirectory() as d:
@@ -348,10 +352,74 @@ def bootstrap_version(tree: Path, key: str) -> str:
         run(["dpkg-deb", "-x", f"{d}/old.deb", f"{d}/x"])
         changed = payload(Path(d, "x")) != payload(tree)
     serial = int(rx.fullmatch(old["name"])[1]) + changed
-    return f"1.{max(serial, FLOOR)}+{key[-8:].lower()}"
+    return f"1.{max(serial, floor)}+{suffix}"
 
 
-def bootstrap(specs: dict, key: str) -> None:
+def add_repo(tree: Path, name: str, spec: dict) -> None:
+    """Write one third-party apt source and its key into a package tree.
+
+    The key is pinned by hash like every payload, so the day a vendor rotates
+    one the build stops with the served hash in the error rather than shipping
+    a key nobody checked. Armoured and binary keys both work as Signed-By, so
+    whatever the vendor serves is stored unchanged under the matching suffix.
+    """
+    # Not through http(): that attaches GITHUB_TOKEN to any github.com host,
+    # and cli.github.com is one. A vendor key needs no credential of ours.
+    req = urllib.request.Request(spec["key"],
+                                 headers={"User-Agent": "diamondinoia-apt"})
+    blob = urllib.request.urlopen(req).read()
+    got = hashlib.sha256(blob).hexdigest()
+    if got != spec["key_sha256"]:
+        raise SystemExit(f"{name}: key at {spec['key']} hashes {got}, "
+                         f"not the pinned {spec['key_sha256']}")
+    suffix = "asc" if blob.startswith(b"-----BEGIN") else "gpg"
+    (tree / f"etc/apt/keyrings/{name}.{suffix}").write_bytes(blob)
+
+    fields = {"Types": "deb", "URIs": spec["uris"], "Suites": spec["suites"]}
+    for f in ("components", "architectures"):
+        if spec.get(f):
+            fields[f.capitalize()] = spec[f]
+    fields["Signed-By"] = f"/etc/apt/keyrings/{name}.{suffix}"
+    (tree / f"etc/apt/sources.list.d/{name}.sources").write_text(
+        "".join(f"{k}: {v}\n" for k, v in fields.items()))
+
+
+def repo_package(name: str, spec: dict) -> None:
+    """Build diamondinoia-repo-<name>: one third-party source, nothing else.
+
+    A repository wanted only by the machine that has the matching hardware does
+    not belong in the bootstrap, where everyone who adds this repository would
+    get it.
+    """
+    pkg = f"diamondinoia-repo-{name}"
+    tree = OUT / f"{pkg}-tree"
+    shutil.rmtree(tree, ignore_errors=True)
+    for d in ("DEBIAN", "etc/apt/keyrings", "etc/apt/sources.list.d"):
+        (tree / d).mkdir(parents=True)
+    add_repo(tree, name, spec)
+
+    version = content_version(pkg, tree, spec["key_sha256"][:8])
+    (tree / "DEBIAN/control").write_text(
+        f"Package: {pkg}\n"
+        f"Version: {version}\n"
+        "Architecture: all\n"
+        f"Maintainer: {MAINTAINER}\n"
+        "Depends: apt, ca-certificates\n"
+        "Section: admin\n"
+        "Priority: optional\n"
+        "Homepage: https://github.com/DiamonDinoia/apt\n"
+        f"Description: {spec['description']}\n"
+        f" Installs {spec['key']} and the matching source entry. The key is\n"
+        " pinned by SHA-256 at build time, so a rotated key fails the build\n"
+        " rather than reaching a machine unchecked.\n"
+    )
+    run(["dpkg-deb", "--root-owner-group", "--build", str(tree),
+         str(OUT / f"{pkg}_{version}_all.deb")])
+    shutil.rmtree(tree)
+    print(f"{pkg}: {version}")
+
+
+def bootstrap(specs: dict, repos: dict, key: str) -> None:
     """Package the keyring, the source and the pin, so adding this repository
     is one `dpkg -i` rather than three files a user has to get right by hand."""
     tree = OUT / "bootstrap-tree"
@@ -371,11 +439,20 @@ def bootstrap(specs: dict, key: str) -> None:
         f"Signed-By: /etc/apt/keyrings/{LABEL}.gpg\n"
     )
 
+    # A machine that wants this repository at all wants a current llvm and gh,
+    # so the sources that are not hardware-specific ride here rather than in a
+    # package of their own.
+    for repo, rspec in repos.items():
+        if not rspec.get("separate"):
+            add_repo(tree, repo, rspec)
+
     # A package that only fills a gap until the distribution fills it sits
     # below the archive's own 500, so the archive wins by priority alone the
     # day it ships that name. Above zero, so it still installs until then.
     defer = [n for n, s in specs.items() if s.get("defer_to_debian")]
-    pinned = [BOOTSTRAP, *(n for n in specs if n not in defer)]
+    pinned = [BOOTSTRAP, *(f"diamondinoia-repo-{n}" for n, r in repos.items()
+                           if r.get("separate")),
+              *(n for n in specs if n not in defer)]
 
     # Pinned on the Release label, not the host, so the pin holds whatever the
     # repository is served from and never claims every package on github.com.
@@ -391,7 +468,7 @@ def bootstrap(specs: dict, key: str) -> None:
            "Pin-Priority: 100\n" if defer else "")
     )
 
-    version = bootstrap_version(tree, key)
+    version = content_version(BOOTSTRAP, tree, key[-8:].lower(), FLOOR)
     (tree / "DEBIAN/control").write_text(
         f"Package: {BOOTSTRAP}\n"
         f"Version: {version}\n"
@@ -403,7 +480,8 @@ def bootstrap(specs: dict, key: str) -> None:
         "Homepage: https://github.com/DiamonDinoia/apt\n"
         "Description: apt source for the DiamonDinoia repository\n"
         " Installs the signing key, the source entry and a pin that confines\n"
-        " this repository to the packages it is meant to provide.\n"
+        " this repository to the packages it is meant to provide, together\n"
+        " with the third-party sources a workstation needs anyway.\n"
     )
     run(["dpkg-deb", "--root-owner-group", "--build", str(tree),
          str(OUT / f"{BOOTSTRAP}_{version}_all.deb")])
@@ -446,6 +524,7 @@ def main() -> int:
     args = parser.parse_args()
 
     specs = tomllib.loads((ROOT / "packages.toml").read_text())
+    repos = specs.pop("repos", {})
     if args.only:
         specs = {k: v for k, v in specs.items() if k in args.only}
 
@@ -465,7 +544,10 @@ def main() -> int:
 
     key = os.environ.get("GPG_KEY_ID")
     if key:
-        bootstrap(specs, key)
+        bootstrap(specs, repos, key)
+    for name, spec in repos.items():
+        if spec.get("separate"):
+            repo_package(name, spec)
     index()
     for p in sorted(OUT.iterdir()):
         print(f"  {p.stat().st_size:>10,}  {p.name}")

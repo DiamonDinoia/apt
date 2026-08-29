@@ -55,8 +55,15 @@ defer=$(awk '/^\[/{ p=substr($0, 2, length($0) - 2) }
              /^defer_to_debian *= *true/{ printf "%s ", p }' \
         "$(dirname "$0")/packages.toml")
 
+# The hosts of the third-party sources the bootstrap package carries, so the
+# check below follows packages.toml rather than listing eight names again.
+hosts=$(python3 -c "import tomllib, re
+repos = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))['repos']
+print(' '.join(re.sub(r'https?://([^/]+).*', r'\1', r['uris'].split()[0])
+                for r in repos.values() if not r.get('separate')))")
+
 echo "==> repository checks"
-"$engine" run --rm -i -v "$repo:/repo:ro" -e "DEFER=$defer" debian:sid \
+"$engine" run --rm -i -v "$repo:/repo:ro" -e "DEFER=$defer" -e "HOSTS=$hosts" debian:sid \
     bash -eo pipefail -s <<'SCRIPT'
 rc=0
 apt-get update -qq
@@ -65,6 +72,38 @@ apt-get install -y --no-install-recommends curl
 
 test -s /etc/apt/keyrings/diamondinoia.gpg
 grep '^Pin-Priority: 600' /etc/apt/preferences.d/diamondinoia >/dev/null
+
+# Our own source names GitHub, which does not hold this build and whose index is
+# signed by the published key rather than the one this build shipped. Pointing
+# it at the local tree, exactly as the per-package containers do, puts it under
+# the strict update below instead of leaving it a permanent warning.
+sed -i 's|^URIs: .*|URIs: file:///repo/|' /etc/apt/sources.list.d/diamondinoia.sources
+
+# The bootstrap also carries third-party sources. A key that no longer matches
+# the repository signing it makes apt refuse that source, and Error-Mode=any is
+# what turns apt's warning into a failure. The list file is the evidence that
+# the source was fetched, not merely that the update as a whole survived.
+apt-get update -qq -o APT::Update::Error-Mode=any
+for h in $HOSTS; do
+    if ls /var/lib/apt/lists/ | grep -q "^$h"; then
+        echo "ok    $h verifies against the shipped key"
+    else
+        echo "FAIL  no index fetched from $h"; rc=1
+    fi
+done
+
+# Positive control for the loop above, on one host rather than all eight: the
+# same strict update has to reject a source whose key is noise. tailscale is
+# the cheapest to refetch. A loop that only ever sees good keys proves nothing.
+cp /etc/apt/keyrings/tailscale.gpg /tmp/key.bak
+head -c 64 /dev/urandom > /etc/apt/keyrings/tailscale.gpg
+rm -f /var/lib/apt/lists/pkgs.tailscale.com*
+if apt-get update -qq -o APT::Update::Error-Mode=any >/dev/null 2>&1; then
+    echo "FAIL  positive control: a corrupt tailscale key verified anyway"; rc=1
+else
+    echo "ok    positive control: a corrupt key is refused"
+fi
+cp /tmp/key.bak /etc/apt/keyrings/tailscale.gpg
 
 # A package that defers to the distribution has to sit in the 100 stanza. At
 # 600 it outranks the archive and the handover never happens; named in neither
@@ -117,8 +156,8 @@ for pkg in $want; do
   # From packages.toml rather than from the postinst, so a link the build drops
   # fails here, before publication, instead of only in test_gcc17.sh after it.
   links=$(python3 -c "import tomllib
-spec = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))['$pkg']
-print(' '.join(spec.get('links', {})))")
+spec = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))
+print(' '.join(spec.get('$pkg', {}).get('links', {})))")
   "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" -e "LINKS=$links" debian:sid \
       bash -eo pipefail -s <<'SCRIPT'
 apt-get update -qq
@@ -135,7 +174,7 @@ for pkg in $WANT; do
     fi
     # What the package claims to install is read back out of its own postinst,
     # so the check follows the package rather than guessing from its name.
-    script=$(dpkg-deb -I /repo/"$pkg"_*.deb postinst)
+    script=$(dpkg-deb -I /repo/"$pkg"_*.deb postinst 2>/dev/null) || script=
     bin=$(sed -n 's|^chmod 0755 /usr/bin/\(.*\)$|\1|p' <<<"$script")
 
     if [ -s "/var/lib/$pkg.files" ]; then
@@ -154,6 +193,41 @@ for pkg in $WANT; do
             printf 'FAIL  %-18s /usr/bin/%s absent\n' "$pkg" "$bin"; rc=1; continue
         fi
         what="/usr/bin/$bin"
+    elif src=$(dpkg -L "$pkg" | grep '^/etc/apt/sources.list.d/.*\.sources$'); then
+        # A repository package installs no program, so the property to check is
+        # that apt can fetch and verify the source it added with the key it
+        # shipped. Error-Mode=any turns apt's warning about a failed source into
+        # a failure, and the list file proves this source was the one fetched
+        # rather than the update merely succeeding on the others.
+        key=$(sed -n 's|^Signed-By: ||p' "$src")
+        if [ ! -s "$key" ]; then
+            printf 'FAIL  %-18s Signed-By names %s, which is not there\n' "$pkg" "$key"
+            rc=1; continue
+        fi
+        if ! apt-get update -qq -o APT::Update::Error-Mode=any >/dev/null; then
+            printf 'FAIL  %-18s apt-get update rejects the source it added\n' "$pkg"
+            rc=1; continue
+        fi
+        host=$(sed -n 's|^URIs: ||p' "$src" | awk '{ print $1 }' |
+               sed -E 's|https?://||; s|/.*||')
+        if ! ls /var/lib/apt/lists/ | grep -q "^$host"; then
+            printf 'FAIL  %-18s no index fetched from %s\n' "$pkg" "$host"
+            rc=1; continue
+        fi
+        # Positive control: with the shipped key replaced by noise, the same
+        # strict update has to reject this source. Only this source's list
+        # files are dropped, so apt refetches it and nothing else. Without the
+        # control a green run cannot be told from a check that verifies
+        # nothing, which is what a stale InRelease in the cache would give.
+        cp "$key" /tmp/key.bak
+        head -c 64 /dev/urandom > "$key"
+        rm -f /var/lib/apt/lists/"$host"*
+        if apt-get update -qq -o APT::Update::Error-Mode=any >/dev/null 2>&1; then
+            printf 'FAIL  %-18s positive control: a corrupt key verified anyway\n' "$pkg"
+            rc=1
+        fi
+        cp /tmp/key.bak "$key"
+        what="$host verified with $(basename "$key"), corrupt key refused"
     elif [ -d "/opt/$pkg" ]; then
         # A tree is only usable if the launcher symlink resolves into it.
         target=$(readlink -f "/usr/bin/$pkg" 2>/dev/null)

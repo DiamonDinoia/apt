@@ -207,3 +207,96 @@ license = "GPL-3.0-or-later with GCC Runtime Library Exception"
 "gnatmake-17" = "bin/gnatmake"
 "gnatname-17" = "bin/gnatname"
 "gnatprep-17" = "bin/gnatprep"
+
+# Third-party apt sources this repository sets up, so a fresh machine needs one
+# install rather than ten hand-written files. Each key is fetched at build time
+# and checked against the sha256 below, so a rotated key stops the build with
+# the new hash instead of shipping whatever the URL happened to serve. The
+# fields are the deb822 ones and go into the .sources verbatim.
+#
+# `separate` puts a repository in its own diamondinoia-repo-<name> package.
+# Only the two that are specific to one machine's hardware are separate; the
+# rest ride in the bootstrap, because a machine that wants this repository at
+# all wants a current llvm and gh.
+
+[repos.brave]
+uris = "https://brave-browser-apt-release.s3.brave.com/"
+suites = "stable"
+components = "main"
+key = "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg"
+key_sha256 = "c85e85aa3d1783ffaa649ee8dbbc22af7f87192d304602d37e3018226b394788"
+
+[repos.github-cli]
+uris = "https://cli.github.com/packages/"
+suites = "stable"
+components = "main"
+key = "https://cli.github.com/packages/githubcli-archive-keyring.gpg"
+key_sha256 = "6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b"
+
+[repos.google-cloud-cli]
+uris = "https://packages.cloud.google.com/apt"
+suites = "cloud-sdk"
+components = "main"
+architectures = "amd64"
+key = "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+key_sha256 = "3ecc63922b7795eb23fdc449ff9396f9114cb3cf186d6f5b53ad4cc3ebfbb11f"
+
+# One stanza, not five: deb822 Suites takes a list, and the five llvm-toolchain
+# suites differ in nothing else.
+[repos.llvm]
+uris = "https://apt.llvm.org/unstable/"
+suites = "llvm-toolchain llvm-toolchain-19 llvm-toolchain-20 llvm-toolchain-21 llvm-toolchain-22"
+components = "main"
+architectures = "amd64 arm64"
+key = "https://apt.llvm.org/llvm-snapshot.gpg.key"
+key_sha256 = "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d"
+
+# Stable and experimental share a key and a suite, so URIs takes both.
+[repos.nvidia-container-toolkit]
+uris = "https://nvidia.github.io/libnvidia-container/stable/deb/amd64/ https://nvidia.github.io/libnvidia-container/experimental/deb/amd64/"
+suites = "/"
+key = "https://nvidia.github.io/libnvidia-container/gpgkey"
+key_sha256 = "c880576d6cf75a48e5027a871bac70fd0421ab07d2b55f30877b21f1c87959c9"
+
+[repos.onlyoffice]
+uris = "https://download.onlyoffice.com/repo/debian/"
+suites = "squeeze"
+components = "main"
+key = "https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE"
+key_sha256 = "35470c0db19bed875fff786a2d65a62cdb056459a2b3e12fd846be96178388e4"
+
+[repos.tailscale]
+uris = "https://pkgs.tailscale.com/stable/debian/"
+suites = "sid"
+components = "main"
+key = "https://pkgs.tailscale.com/stable/debian/sid.noarmor.gpg"
+key_sha256 = "3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39"
+
+[repos.yazi]
+uris = "https://yazi-rs.github.io/builds/"
+suites = "stable"
+components = "main"
+key = "https://yazi-rs.github.io/builds/yazi-keyring.gpg"
+key_sha256 = "3da842333fc9ec420e404772267a2df4e7fdcee11396820bcf8eae93760d7f26"
+
+# Separate, because both are wanted only by the machine that has the hardware.
+
+[repos.cuda]
+separate = true
+# debian13, not the debian12 this laptop was configured with: the debian12 key
+# A4B469963BF863CC self-certifies with SHA-1, and sequoia's sqv, which apt on
+# sid uses, has rejected SHA-1 since 2026-02-01, so that source cannot verify
+# at all. The debian13 key 97A5D4CB8793F200 self-certifies with SHA-256.
+uris = "https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/"
+suites = "/"
+key = "https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/8793F200.pub"
+key_sha256 = "09edb5196bca272c091633d4e04dd6c8f3a07278834868220aa669c895f6cfd7"
+description = "apt source for NVIDIA's CUDA repository"
+
+[repos.juno]
+separate = true
+uris = "https://deb.junocomputers.com/"
+suites = "/"
+key = "https://deb.junocomputers.com/gpg.key"
+key_sha256 = "06347ea57cf8ce6c96cf673f32a34cd6a520c0a0b5aef5db393702072f598901"
+description = "apt source for Juno Computers' repository"

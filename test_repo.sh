@@ -178,4 +178,33 @@ else
   echo "FAIL  the README table and packages.toml disagree"; fail=1
 fi
 
+# Check 8: the README prints the pin file, and a reader who trusts it has to be
+# reading the pin the package installs. The 600 stanza gained two names when
+# the repo packages appeared and the README kept the old list, which is the
+# same drift check 6 exists for, on the other block of the same document.
+dpkg-deb --fsys-tarfile "$repo/$boot" |
+    tar -xO ./etc/apt/preferences.d/diamondinoia > "$work/pin" 2>/dev/null
+if python3 - "$work/pin" <<'DOC'; then
+import re, sys
+
+def names(text):
+    # A continuation line starts with a space, so this cannot run past the
+    # stanza above into the one that is pinned at -1.
+    m = re.search(r"Package: ((?:[^\n]|\n )*)\n"
+                  r"Pin: release l=diamondinoia\nPin-Priority: 600", text)
+    return set(m.group(1).split()) if m else set()
+
+built = names(open(sys.argv[1]).read())
+doc = names(re.sub(r"^    ", "", open("README.md").read(), flags=re.M))
+for n in sorted(doc - built):
+    print(f"      the README pins {n}, which the built pin does not")
+for n in sorted(built - doc):
+    print(f"      the built pin holds {n}, which the README does not")
+sys.exit(not built or built != doc)
+DOC
+  echo "ok    the README prints the pin the package installs"
+else
+  echo "FAIL  the README pin and the built pin disagree"; fail=1
+fi
+
 exit $fail
