@@ -277,11 +277,11 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
         "launchers": " ".join(spec.get("launcher", [])),
         "unpack": unpack_command(spec, info["source"], prefix),
         # A tree that ships a toolchain needs more than one command in PATH.
-        # Every link is checked, because a target upstream dropped would
-        # otherwise become a dangling symlink no later check notices.
+        # Each target is checked before it is linked, so a tool upstream
+        # dropped fails the install instead of leaving a dangling symlink.
         "links": "".join(
-            f'ln -sfn {prefix}/{target} /usr/bin/{link}\n'
             f'[ -x {prefix}/{target} ] || {{ echo "missing: {target}" >&2; exit 1; }}\n'
+            f'ln -sfn {prefix}/{target} /usr/bin/{link}\n'
             for link, target in spec.get("links", {}).items()),
         "link_names": " ".join(f"/usr/bin/{link}" for link in spec.get("links", {})),
     }

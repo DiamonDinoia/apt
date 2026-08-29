@@ -15,9 +15,15 @@ boot=$(gh release view repo --repo "$repo" --json assets \
 [ -n "$boot" ] || { echo "FAIL  no bootstrap package in the repo release"; exit 1; }
 echo "bootstrap: $boot"
 
-"$engine" run --rm -i debian:sid bash -s "$boot" <<'INNER'
+# The link names come from packages.toml, so the test cannot drift from the
+# package: a tool added there is a tool checked here.
+links=$(python3 -c "import tomllib, sys
+print(' '.join(tomllib.load(open('packages.toml', 'rb'))['gcc-17']['links']))")
+
+"$engine" run --rm -i debian:sid bash -s "$boot" "$links" <<'INNER'
 set -euo pipefail
 boot=$1
+links=$2
 fail() { echo "FAIL  $*"; exit 1; }
 ok()   { echo "  ok   $*"; }
 
@@ -81,10 +87,39 @@ ok "candidate is the nightly"
 
 echo "== install, with signature verification left on"
 apt-get install -y gcc-17
-for c in gcc-17 g++-17 gfortran-17; do
+# A symlink on PATH proves only that a name exists. Running each one proves
+# the target behind it is present and can start, which is what catches a tool
+# the payload dropped or one that cannot find its own runtime.
+for c in gcc-17 $links; do
     command -v "$c" >/dev/null || fail "$c is not on PATH"
+    "$c" --version >/dev/null 2>&1 || fail "$c is on PATH but exits non-zero"
 done
-ok "gcc-17, g++-17 and gfortran-17 are on PATH"
+ok "gcc-17 and all $(wc -w <<<"$links") linked tools run"
+
+# A tool that starts is not a tool that links. libgcobol.so needs libxml2, which
+# no --version call touches, so gcobol-17 died at link time in a container that
+# had only what this package declares. Every payload library and every linked
+# tool has to resolve against those declarations alone.
+unresolved() {          # libraries $1 needs that the container cannot supply
+    local out
+    # ldd answers non-zero for a script or a static object, which is a normal
+    # answer here, so the verdict is the text it prints, not its exit status.
+    out=$(ldd "$1" 2>/dev/null) || out=
+    printf '%s\n' "$out" | awk -v f="${1##*/}" '/not found/{ print f, $1 }'
+}
+missing=$(for f in /opt/gcc-17/lib64/*.so*; do unresolved "$f"; done
+          for c in $links; do unresolved "$(readlink -f "/usr/bin/$c")"; done)
+[ -z "$missing" ] || fail "unresolved shared libraries:$(printf '\n  %s' $missing)"
+ok "every payload library and every linked tool resolves"
+
+# Control for the sweep above: go and gofmt are Go programs with no rpath to
+# the payload's libgo, which is exactly why neither is linked onto PATH. A
+# sweep that cannot see those two cannot see anything.
+for c in go gofmt; do
+    [ -n "$(unresolved /opt/gcc-17/bin/$c)" ] ||
+        fail "control: $c resolves, so the sweep above proves nothing"
+done
+ok "control: the unlinked go and gofmt are seen as unresolvable"
 
 echo "== the compiler reports the major the package is named for"
 gcc-17 --version | sed -n 1p
@@ -116,6 +151,103 @@ gfortran-17 -O2 -Wl,-rpath,/opt/gcc-17/lib64 -o /tmp/tf /tmp/t.f90 ||
     fail "gfortran-17 could not compile"
 [ "$(/tmp/tf)" = 5050 ] || fail "fortran program printed '$(/tmp/tf)'"
 ok "gfortran-17 with the documented -Wl,-rpath compiles and prints 5050"
+
+# Every front end the payload ships that can compile a program today. gccrs
+# refuses by design, "gccrs is not yet able to compile Rust code properly", and
+# ga68 is left at the version check with it; both are still linked, so the loop
+# above proves they start. Each language sums 1..100 so one expected string
+# covers them all, and each links with the documented rpath because the runtime
+# libraries live in the payload, not in Debian.
+rp=-Wl,-rpath,/opt/gcc-17/lib64
+mkdir -p /tmp/lang && cd /tmp/lang
+
+cat > h.adb <<'ADA'
+with Ada.Text_IO;
+procedure H is
+   S : Integer := 0;
+begin
+   for I in 1 .. 100 loop S := S + I; end loop;
+   Ada.Text_IO.Put_Line (Integer'Image (S));
+end H;
+ADA
+cat > h.d <<'D'
+import std.stdio;
+void main() { int s = 0; foreach (i; 1 .. 101) s += i; writeln(s); }
+D
+cat > h.mod <<'MOD'
+MODULE h ;
+FROM StrIO IMPORT WriteLn ;
+FROM NumberIO IMPORT WriteCard ;
+VAR s, i: CARDINAL ;
+BEGIN
+   s := 0 ;
+   FOR i := 1 TO 100 DO s := s + i END ;
+   WriteCard(s, 0) ; WriteLn
+END h.
+MOD
+cat > h.go <<'GO'
+package main
+import "fmt"
+func main() { s := 0; for i := 1; i <= 100; i++ { s += i }; fmt.Println(s) }
+GO
+cat > h.cob <<'COB'
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. H.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 S PIC 9(5) VALUE 0.
+       01 I PIC 9(5).
+       PROCEDURE DIVISION.
+           PERFORM VARYING I FROM 1 BY 1 UNTIL I > 100
+               COMPUTE S = S + I
+           END-PERFORM
+           DISPLAY S
+           STOP RUN.
+COB
+
+# Ada is the odd one: gnatmake drives the whole chain, so the linker flag has
+# to be passed through to it rather than given to a compiler driver.
+gnatmake-17 -q h.adb -bargs -largs "$rp" || fail "gnatmake-17 could not build h.adb"
+gdc-17    -o hd h.d   "$rp" || fail "gdc-17 could not compile h.d"
+gm2-17    -o hm h.mod "$rp" || fail "gm2-17 could not compile h.mod"
+gccgo-17  -o hg h.go  "$rp" || fail "gccgo-17 could not compile h.go"
+gcobol-17 -o hc h.cob "$rp" || fail "gcobol-17 could not compile h.cob"
+
+for pair in "./h Ada 5050" "./hd D 5050" "./hm Modula-2 5050" \
+            "./hg Go 5050" "./hc COBOL 05050"; do
+    set -- $pair
+    out=$("$1" 2>&1 | tr -d ' ')
+    [ "$out" = "$3" ] || fail "$2 printed '$out', expected '$3'"
+done
+ok "Ada, D, Modula-2, Go and COBOL each compile and print the sum"
+cd /
+
+# A symlink on PATH proves nothing about the tool behind it, so each one has
+# to produce its own output from a real input.
+cat > /tmp/cov.c <<'C'
+#include <stdio.h>
+int main(void) {
+    int sum = 0;
+    for (int i = 1; i <= 100; ++i)
+        sum += i;
+    printf("%d\n", sum);
+    return 0;
+}
+C
+cd /tmp
+gcc-17 -O0 --coverage -o cov cov.c
+[ "$(./cov)" = 5050 ] || fail "the instrumented program printed the wrong sum"
+gcov-17 cov.gcno >/dev/null
+cov=$(awk -F: '$2 + 0 == 5 { gsub(/ /, "", $1); print $1 }' /tmp/cov.c.gcov)
+[ "$cov" = 100 ] ||
+    fail "gcov-17 counted '$cov' executions of the loop body, expected 100"
+ok "gcov-17 counts the loop body 100 times"
+
+gcc-17 -O2 -flto -c -o /tmp/lto.o /tmp/cov.c
+syms=$(lto-dump-17 -list /tmp/lto.o)
+grep -w main <<<"$syms" >/dev/null ||
+    fail "lto-dump-17 did not list main:$(printf '\n%s' "$syms")"
+ok "lto-dump-17 lists main out of an LTO object"
 
 echo "== control: a program that must not compile does not"
 echo 'int main(){ return undefined_symbol_xyz(); }' > /tmp/bad.c

@@ -150,8 +150,8 @@ them, and it moves once per version. The one bucket listing per workflow run,
 which is how a new version is noticed, is unavoidable and negligible. The exact source commit of every
 build is embedded in `gcc-17 --version`. The newest two versions are kept.
 
-It installs to `/opt/gcc-17` with `gcc-17`, `g++-17` and `gfortran-17` on
-`PATH`, never shadowing Debian's default compiler.
+It installs to `/opt/gcc-17` and puts 28 commands on `PATH` under Debian's own
+`-17` names, never shadowing Debian's default compiler.
 
 It depends on `libc6-dev`, the same as Debian's own `gcc-NN`: the payload
 carries a compiler, not a C library, so without the system headers it cannot
@@ -159,18 +159,46 @@ preprocess `<cstdio>`, let alone link. Declaring that is not optional. A machine
 that happens to have `build-essential` hides the omission, which is exactly how
 it survived a green CI run.
 
+It also depends on `libxml2`, which the nine `libgcobol` objects link against.
+Nothing in `gcobol-17 --version` touches it, so the omission only appeared when
+a container with no `libxml2` tried to link a COBOL program and `ld` reported
+`undefined reference to xmlCtxtGetLastError@LIBXML2_2.6.0`. `test_gcc17.sh` now
+runs `ldd` over every library in the payload and every linked tool, and fails on
+anything reported `not found`; the unlinked `go` and `gofmt` are its positive
+control, because both are known to be unresolvable.
+
 It needs nothing else. The payload bundles its own binutils, so `as`, `ld`,
 `ar`, `nm`, `objdump`, `readelf`, `strip` and `gprofng` come from
 `/opt/gcc-17/bin` and there is no dependency on Debian's `binutils`. Measured,
 not assumed: a container with `libc6-dev` and no `binutils` links and runs a
 C++ binary.
 
-Only the C, C++ and Fortran drivers are put on `PATH`. The 20260828 payload
-also carried `gccgo`, `gdc`, `gnat`, `gm2`, `gcobol`, `gccrs` and `ga68`, along
-with `lto-dump` and `gcov`, none of them symlinked. That list is Compiler
-Explorer's build configuration, not a guarantee of this package: run
-`ls /opt/gcc-17/bin` to see what a given nightly actually shipped. Call them by their path under
-`/opt/gcc-17/bin`, or add them to `links` in `packages.toml`.
+Every front end and tool the payload ships is linked, spelled the way Debian
+spells it, so a script written against `gcc-17` keeps working after the
+distribution takes the name over:
+
+    gcc-17     g++-17        cpp-17         gfortran-17
+    gccgo-17   gdc-17        gm2-17         gcobol-17     gcobc-17
+    gccrs-17   ga68-17
+    gcc-ar-17  gcc-nm-17     gcc-ranlib-17
+    gcov-17    gcov-dump-17  gcov-tool-17   lto-dump-17
+    gnat-17    gnatbind-17   gnatchop-17    gnatclean-17  gnatkr-17
+    gnatlink-17  gnatls-17   gnatmake-17    gnatname-17   gnatprep-17
+
+The list comes from `packages.toml`, and `test_gcc17.sh` reads it from there
+and runs every entry, so a tool a future payload drops fails CI rather than
+becoming a dangling symlink. Beyond starting them it compiles and runs a
+program in each language that can be compiled today, C, C++, Fortran, Ada, D,
+Modula-2, Go and COBOL, each summing 1 to 100. `gccrs` still answers `gccrs is
+not yet able to compile Rust code properly`, so it and `ga68` are started but
+not exercised.
+
+Two commands are deliberately not linked. `go` and `gofmt` are Go programs
+built against the payload's own `libgo`, so they exit 127 with `error while
+loading shared libraries` unless the loader is pointed at `/opt/gcc-17/lib64`,
+and this package sets no loader path. The bundled binutils are not linked
+either: the driver finds them itself, and Debian's `gcc-NN` does not put them
+in `PATH` either.
 
 Binaries it produces may need the matching runtime, because that lives in the
 payload rather than in Debian. Either pass `-Wl,-rpath,/opt/gcc-17/lib64` or
