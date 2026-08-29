@@ -1,7 +1,8 @@
 #!/bin/bash
 # Mirror the newest Compiler Explorer gcc-trunk nightly into this repository's
-# `mirror` release, so the publisher is downloaded from exactly once per version
-# and every install, test and rebuild pulls from GitHub instead.
+# `mirror` release, so the 4e8-byte tarball is downloaded from the publisher
+# exactly once per version and every install, test and rebuild pulls from GitHub
+# instead. Noticing a new version still costs one bucket listing per run.
 #
 # GCC is GPL and may be redistributed. Compiler Explorer pays for its own S3
 # egress, which is the whole reason this file exists: the alternative pins their

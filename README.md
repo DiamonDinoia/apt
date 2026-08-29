@@ -145,7 +145,9 @@ Explorer pays for its own S3 egress, so pointing every install at their bucket
 would spend their money. GCC is GPL and may be redistributed, so `mirror.sh`
 downloads each new nightly from them exactly once and re-publishes it as an
 asset of the `mirror` release here; the package pins the GitHub URL, and no
-install or test ever reaches their bucket. The exact source commit of every
+install or test ever reaches their bucket. The 4e8-byte tarball is what costs
+them, and it moves once per version. The one bucket listing per workflow run,
+which is how a new version is noticed, is unavoidable and negligible. The exact source commit of every
 build is embedded in `gcc-17 --version`. The newest two versions are kept.
 
 It installs to `/opt/gcc-17` with `gcc-17`, `g++-17` and `gfortran-17` on
@@ -163,9 +165,11 @@ It needs nothing else. The payload bundles its own binutils, so `as`, `ld`,
 not assumed: a container with `libc6-dev` and no `binutils` links and runs a
 C++ binary.
 
-Only the C, C++ and Fortran drivers are put on `PATH`. The payload also carries
-`gccgo`, `gdc`, `gnat`, `gm2`, `gcobol`, `gccrs` and `ga68`, along with
-`lto-dump` and `gcov`, none of them symlinked. Call them by their path under
+Only the C, C++ and Fortran drivers are put on `PATH`. The 20260828 payload
+also carried `gccgo`, `gdc`, `gnat`, `gm2`, `gcobol`, `gccrs` and `ga68`, along
+with `lto-dump` and `gcov`, none of them symlinked. That list is Compiler
+Explorer's build configuration, not a guarantee of this package: run
+`ls /opt/gcc-17/bin` to see what a given nightly actually shipped. Call them by their path under
 `/opt/gcc-17/bin`, or add them to `links` in `packages.toml`.
 
 Binaries it produces may need the matching runtime, because that lives in the
@@ -175,10 +179,24 @@ and runs a C++ program the static way and a Fortran program the rpath way, so
 both forms in this paragraph are checked rather than assumed.
 
 The name and the commands are Debian's, on purpose. The version is
-`17~trunkYYYYMMDD`, and `~` sorts below everything, so this package stays below
-every version Debian could publish as `gcc-17`, including a pre-release upload
-numbered `17-<date>-1`. Debian's real `gcc-17` then replaces this one on a plain
-`apt upgrade` the day it enters the archive, with nothing to uninstall by hand.
+`17~trunkYYYYMMDD`, and `~` sorts below a plain digit, so this package stays
+below the two forms Debian has used for a `gcc-NN` package, `17.1.0-1` and
+`17-<date>-1`, both measured with `dpkg --compare-versions`. Debian's real
+`gcc-17` then replaces this one on a plain `apt upgrade` the day it reaches
+unstable, with nothing to uninstall by hand.
+
+The claim is that narrow on purpose. After a `~` the rest is compared as text,
+so `17~exp1-1` and `17~rc1-1` both sort *above* `17~trunk20260828`. Debian has
+never numbered a `gcc-NN` upload that way, but if it did, the handover would
+need `apt install gcc-17=<version>` once by hand. No version string avoids
+this: anything sorting below `17~exp` also sorts below the nightlies already
+installed, which would stop those machines receiving any further nightly.
+
+Handover happens from unstable, not from experimental. Debian's experimental
+`Release` carries `NotAutomatic: yes` and no `ButAutomaticUpgrades`, so apt
+gives it priority 1, below the 100 this package holds. A `gcc-17` that only
+ever reaches experimental therefore does not displace the nightly, which is
+also what a user who enabled experimental should expect.
 
 Both halves are needed. `apt` will not downgrade across priorities, so a higher
 pin on Debian's side does not by itself displace a nightly whose version is
