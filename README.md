@@ -73,10 +73,12 @@ network before apt runs. The files land in `/etc`, so they are conffiles: an
 edit survives an upgrade, and removing the package leaves them until purge.
 
 `diamondinoia-repo-cuda` points at NVIDIA's `debian13` repository. The
-`debian12` one cannot be used on Debian 13 or later at all: its key
-`A4B469963BF863CC` self-certifies with SHA-1, which sequoia's `sqv` has
-rejected since 2026-02-01, so every `apt-get update` fails on it. A machine
-that already has that source needs it taken away by hand:
+`debian12` key `A4B469963BF863CC` self-certifies with SHA-1, which sequoia's
+`sqv` rejects from 2026-02-01, so on a stock Debian 13 that source fails every
+`apt-get update`. It verifies only where a local
+`/etc/crypto-policies/back-ends/sequoia.config` re-enables SHA-1, and that
+override weakens signature checking for every apt source, not only NVIDIA's.
+A machine carrying the old source can drop it:
 
     sudo rm /etc/apt/sources.list.d/cuda-debian12-x86_64.sources
 
