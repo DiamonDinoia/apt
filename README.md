@@ -21,10 +21,13 @@ tagged `repo`.
 
 ## Use it
 
-One package installs the key, the source and the pin:
+One package installs the key, the source and the pin. Its file name carries a
+version that moves, so take the name from the index rather than typing it:
 
-    curl -fsSLO https://github.com/DiamonDinoia/apt/releases/download/repo/diamondinoia-apt_1.0+939a3a3d_all.deb
-    sudo apt-get install ./diamondinoia-apt_*.deb
+    base=https://github.com/DiamonDinoia/apt/releases/download/repo
+    deb=$(curl -fsSL $base/Packages | sed -n 's/^Filename: \(diamondinoia-apt_.*\)$/\1/p')
+    curl -fsSLO "$base/$deb"
+    sudo apt-get install ./"$deb"
     sudo apt-get update
 
 The pin it installs confines this repository to the packages it is meant to

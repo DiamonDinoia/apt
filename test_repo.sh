@@ -178,6 +178,22 @@ else
   echo "FAIL  the README table and packages.toml disagree"; fail=1
 fi
 
+# Check 7: the README's install command must not name a version. It named
+# 1.0+939a3a3d and kept naming it after the serial moved to 1.1, so the very
+# first command a new user runs answered 404. Check 5 already proves the name
+# derived from the published index is fetchable; this proves the README derives
+# it rather than spelling it out.
+if grep -qE 'diamondinoia-apt_[0-9]' README.md; then
+  echo "FAIL  the README hardcodes a bootstrap version in an install command"; fail=1
+else
+  echo "ok    the README derives the bootstrap file name from the index"
+fi
+if ! grep -qE 'diamondinoia-apt_[0-9]' <<<'diamondinoia-apt_1.0+abc12345_all.deb'; then
+  echo "FAIL  positive control: the pattern misses a versioned file name"; fail=1
+else
+  echo "ok    positive control: the pattern catches a versioned file name"
+fi
+
 # Check 8: the README prints the pin file, and a reader who trusts it has to be
 # reading the pin the package installs. The 600 stanza gained two names when
 # the repo packages appeared and the README kept the old list, which is the
