@@ -152,33 +152,23 @@ license = "MIT"
 section = "devel"
 
 # Juno's own drivers, forked and modified in DiamonDinoia/juno-drivers-debian,
-# whose CI builds and container-tests them and attaches the debs to its
+# whose CI builds and container-tests the package and attaches it to its
 # `builds` release. The payload is the package: the wrappers would drop the
-# deb's own maintainer scripts, so the deb is served here bit-identical,
-# verified against the asset digest GitHub reports. Juno's unmodified packages
+# deb's own maintainer scripts, so it is served here bit-identical, verified
+# against the asset digest GitHub reports. juno-drivers-diamon Conflicts/
+# Replaces every earlier layout (juno-drivers, juno-drivers-local, juno-grub),
+# so apt swaps them out. Juno's unmodified packages (juno-info, check-battery)
 # come from Juno's own repository via diamondinoia-repo-juno.
-[juno-drivers]
-install = "passthrough"
-repo = "DiamonDinoia/juno-drivers-debian"
-tag = "builds"
-asset = '^juno-drivers_[^_]+_amd64\.deb$'
-version_re = '^juno-drivers_([^_]+)_amd64\.deb$'
-# juno-info and check-battery resolve from Juno's own repository, so the
-# container test installs the source package first, exactly as a user would.
-with = ["diamondinoia-repo-juno"]
-description = "Debian drivers for Juno Computers, forked build"
-homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
-
-# juno-drivers-diamon is the fork's addition: GRUB cmdline and CPU turbo policy
-# for the machine's own Juno model.
 [juno-drivers-diamon]
 install = "passthrough"
 repo = "DiamonDinoia/juno-drivers-debian"
 tag = "builds"
 asset = '^juno-drivers-diamon_[^_]+_amd64\.deb$'
 version_re = '^juno-drivers-diamon_([^_]+)_amd64\.deb$'
+# juno-info and check-battery resolve from Juno's own repository, so the
+# container test installs the source package first, exactly as a user would.
 with = ["diamondinoia-repo-juno"]
-description = "Local Juno GRUB and CPU policy integration, forked build"
+description = "Juno drivers with local GRUB and CPU policy, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
 [gcc-17]

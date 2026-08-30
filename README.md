@@ -43,7 +43,7 @@ provide, so it can never shadow Debian:
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
-    Package: juno-drivers juno-drivers-diamon
+    Package: juno-drivers-diamon
     Pin: release l=diamondinoia
     Pin-Priority: 500
 
@@ -331,41 +331,42 @@ The failure is loud rather than silent because `mirror.sh` reads the major out
 of the payload's `lib/gcc/<target>/<version>/` path and puts it in the asset
 name, so the name can never disagree with the compiler inside it.
 
-## The exception: juno-drivers
+## The exception: juno-drivers-diamon
 
-`juno-drivers` and `juno-drivers-diamon` are Juno Computers' own driver packages,
-maintained in
+`juno-drivers-diamon` is Juno Computers' driver package as maintained in
 [DiamonDinoia/juno-drivers-debian](https://github.com/DiamonDinoia/juno-drivers-debian),
-a fork that carries local fixes on top of Juno's packaging. The fork's CI
-builds both `.deb`s, installs them in a clean `debian:sid` container, and
-publishes them as assets of its `builds` release.
+a fork that carries local fixes on top of Juno's packaging. One package carries
+the whole payload: the fork's CI builds the `.deb`, installs it in a clean
+`debian:sid` container (starting from Juno's own packages, to prove the swap),
+and publishes it as an asset of its `builds` release.
 
 The wrapper shapes would drop the maintainer scripts that do the real work, so
-these packages serve that `.deb` itself, bit-identical: `packages.toml` resolves
+this package serves that `.deb` itself, bit-identical: `packages.toml` resolves
 the newest asset on the release, and the build stops unless the bytes hash to
 the digest GitHub reported and the deb's own `Package:`/`Version:` match. Only
-the packages the fork builds are released this way; Juno's unmodified packages
+the package the fork builds is released this way; Juno's unmodified packages
 (`juno-info`, the wallpapers and so on) keep coming from Juno's repository,
 which `diamondinoia-repo-juno` adds.
 
-The fork versions its builds `0.5.48.1+diamonN`, which sorts above Juno's
+The fork versions its builds `0.5.48.2+diamonN`, which sorts above Juno's
 `0.5.48~debian`, so at the archive's own 500 pin the fork wins on version
 alone. If a Juno release ever lands before the fork rebuilds, that release
 becomes visible and installable rather than shadowed — and the daily workflow
 in the fork watches Juno's changelog and opens an issue, which is the signal
 to rebase and bump the diamon suffix.
 
-`juno-info` and `check-battery`, which only Juno publishes, are in
-`juno-drivers`' `Depends`, so the install is
+The package Provides/Conflicts/Replaces `juno-drivers`, `juno-drivers-local`
+and `juno-grub`, so every earlier layout swaps out. `juno-info` and
+`check-battery`, which only Juno publishes, sit in its `Depends`, so the
+install is
 
     sudo apt-get install diamondinoia-repo-juno
-    sudo apt-get install juno-drivers
+    sudo apt-get install juno-drivers-diamon
 
-and `test_install.sh` walks exactly that path in a container. The renames were
-`0.5.48+localN` → `0.5.48.1+diamonN` and `juno-drivers-local` →
-`juno-drivers-diamon`; the new package Conflicts/Replaces the old, so
-installing it swaps the pair. `+diamon1` alone would have sorted below the
-installed `+local1`, which is what the `.1` in the upstream part is for.
+and `test_install.sh` walks exactly that path in a container. The version
+jumps, `+localN` → `0.5.48.1+diamonN` → merge, are recorded in the fork's
+changelog; the `.1` bump existed because `+diamon1` alone would have sorted
+below the then-installed `+local1`.
 
 ## Signing key
 

@@ -78,8 +78,7 @@ def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 
 # One read per release, not per package: two packages pinned to the same
-# release (juno-drivers and juno-drivers-diamon, whose exact-version Depends
-# binds them) must not straddle a re-publish by resolving seconds apart.
+# release must not straddle a re-publish by resolving seconds apart.
 _RELEASES: dict[str, dict] = {}
 
 
