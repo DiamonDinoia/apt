@@ -396,9 +396,22 @@ def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
     whether this rebuild changed anything. The serial leads the version: a
     rotated key sorts below the key it replaces as often as above it.
     """
-    def payload(root: Path) -> dict[str, bytes]:
-        return {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*")
-                if p.is_file() and p.relative_to(root).parts[0] != "DEBIAN"}
+    def payload(data: Path, debian: Path) -> dict[str, bytes]:
+        # Control data must count as content: a Depends edit or a conffile
+        # membership change has to reach installed machines, which is exactly
+        # the shape of change /etc cannot see. The Version line is excluded so
+        # an unchanged rebuild does not bump itself.
+        out = {str(p.relative_to(data)): p.read_bytes() for p in data.rglob("*")
+               if p.is_file()}
+        for p in debian.rglob("*"):
+            if not p.is_file():
+                continue
+            content = p.read_bytes()
+            if p.name == "control":
+                content = b"".join(l for l in content.splitlines(keepends=True)
+                                   if not l.startswith(b"Version:"))
+            out[f"DEBIAN/{p.name}"] = content
+        return out
 
     rx = re.compile(rf"{pkg}_1\.(\d+)\+[0-9a-f]+_all\.deb")
     try:
@@ -416,7 +429,8 @@ def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
         with urllib.request.urlopen(http(old["browser_download_url"])) as r:
             Path(d, "old.deb").write_bytes(r.read())
         run(["dpkg-deb", "-x", f"{d}/old.deb", f"{d}/x"])
-        changed = payload(Path(d, "x")) != payload(tree)
+        run(["dpkg-deb", "-e", f"{d}/old.deb", f"{d}/e"])
+        changed = payload(Path(d, "x"), Path(d, "e")) != payload(tree, tree / "DEBIAN")
     serial = int(rx.fullmatch(old["name"])[1]) + changed
     return f"1.{max(serial, floor)}+{suffix}"
 
@@ -456,9 +470,17 @@ def conffiles(tree: Path) -> None:
     Without this dpkg overwrites a source the user edited on every upgrade, and
     `apt remove` on the bootstrap deletes the third-party sources and keys it
     carries. Conffiles survive removal and go only on purge.
+
+    The pin file is the exception: it is centrally versioned, so an upgrade
+    must replace it. As a conffile, every pin change prompts every user, and
+    answering "keep mine", which is the default, silently shadows the pin the
+    repository intends to ship — the repo would then add a package no pinned
+    machine can ever install.
     """
-    paths = sorted(f"/{p.relative_to(tree)}" for p in (tree / "etc").rglob("*")
-                   if p.is_file())
+    paths = sorted(
+        f"/{p.relative_to(tree)}" for p in (tree / "etc").rglob("*")
+        if p.is_file()
+        and p.relative_to(tree) != Path("etc/apt/preferences.d") / LABEL)
     (tree / "DEBIAN/conffiles").write_text("".join(f"{p}\n" for p in paths))
 
 
@@ -558,6 +580,17 @@ def bootstrap(specs: dict, repos: dict, key: str) -> None:
 
     conffiles(tree)
     version = content_version(BOOTSTRAP, tree, key[-8:].lower(), FLOOR)
+    # 1.6 and older shipped the pin as a conffile. Removing it from the list is
+    # not enough: a machine whose pin drifted keeps the drift across the
+    # upgrade, quietly vetoing every later pin change. rm_conffile on
+    # preinst removes an untouched pin and moves a touched one to .dpkg-bak,
+    # so the shipped pin is always what the new version installs.
+    preinst = tree / "DEBIAN/preinst"
+    preinst.write_text(
+        "#!/bin/sh\n"
+        f'dpkg-maintscript-helper rm_conffile "/etc/apt/preferences.d/{LABEL}" '
+        f'"{version}~" "{BOOTSTRAP}" -- "$@"\n')
+    preinst.chmod(0o755)
     (tree / "DEBIAN/control").write_text(
         f"Package: {BOOTSTRAP}\n"
         f"Version: {version}\n"
