@@ -529,9 +529,15 @@ def bootstrap(specs: dict, repos: dict, key: str) -> None:
     # below the archive's own 500, so the archive wins by priority alone the
     # day it ships that name. Above zero, so it still installs until then.
     defer = [n for n, s in specs.items() if s.get("defer_to_debian")]
+    # A package this repository republishes (passthrough) competes with the
+    # original publisher on version alone — the fork's suffix already wins
+    # that arithmetic — so it holds the archive's own 500, where a later
+    # upstream release can still be seen and chosen. Anything left out of
+    # every stanza falls to the -1 catch-all and stops being installable.
+    passthrough = [n for n, s in specs.items() if s.get("install") == "passthrough"]
     pinned = [BOOTSTRAP, *(f"diamondinoia-repo-{n}" for n, r in repos.items()
                            if r.get("separate")),
-              *(n for n in specs if n not in defer)]
+              *(n for n in specs if n not in defer and n not in passthrough)]
 
     # Pinned on the Release label, not the host, so the pin holds whatever the
     # repository is served from and never claims every package on github.com.
@@ -542,6 +548,9 @@ def bootstrap(specs: dict, repos: dict, key: str) -> None:
         f"Package: {' '.join(pinned)}\n"
         f"Pin: release l={LABEL}\n"
         "Pin-Priority: 600\n"
+        + (f"\nPackage: {' '.join(passthrough)}\n"
+           f"Pin: release l={LABEL}\n"
+           "Pin-Priority: 500\n" if passthrough else "")
         + (f"\nPackage: {' '.join(defer)}\n"
            f"Pin: release l={LABEL}\n"
            "Pin-Priority: 100\n" if defer else "")

@@ -39,9 +39,13 @@ provide, so it can never shadow Debian:
 
     Package: diamondinoia-apt diamondinoia-repo-cuda diamondinoia-repo-juno act
      lazygit stylua galaxybudsclient ghostty discord zoom clion zed watchexec
-     difftastic lua-language-server juno-drivers juno-drivers-diamon
+     difftastic lua-language-server
     Pin: release l=diamondinoia
     Pin-Priority: 600
+
+    Package: juno-drivers juno-drivers-diamon
+    Pin: release l=diamondinoia
+    Pin-Priority: 500
 
     Package: gcc-17
     Pin: release l=diamondinoia
@@ -345,10 +349,11 @@ the packages the fork builds are released this way; Juno's unmodified packages
 which `diamondinoia-repo-juno` adds.
 
 The fork versions its builds `0.5.48.1+diamonN`, which sorts above Juno's
-`0.5.48~debian`, so the fork wins on version alone; the 600 pin settles any
-doubt. A daily workflow in the fork watches Juno's changelog and opens an issue
-when a new upstream release lands, which is the signal to rebase and bump the
-diamon suffix.
+`0.5.48~debian`, so at the archive's own 500 pin the fork wins on version
+alone. If a Juno release ever lands before the fork rebuilds, that release
+becomes visible and installable rather than shadowed — and the daily workflow
+in the fork watches Juno's changelog and opens an issue, which is the signal
+to rebase and bump the diamon suffix.
 
 `juno-info` and `check-battery`, which only Juno publishes, are in
 `juno-drivers`' `Depends`, so the install is

@@ -96,7 +96,7 @@ print(' '.join(out))" "$1"
 }
 
 echo "==> repository checks"
-"$engine" run --rm -i -v "$repo:/repo:ro" -e "DEFER=$defer" \
+"$engine" run --rm -i -v "$repo:/repo:ro" -e "DEFER=$defer" -e "PT=$ptnames" \
     -e "INDICES=$(indices '')" debian:sid \
     bash -eo pipefail -s <<'SCRIPT'
 rc=0
@@ -162,6 +162,23 @@ Pin: release l=diamondinoia
 Pin-Priority: 600")" ] ||
     { echo "FAIL  positive control: the reader found a 100 stanza in a 600 pin"; exit 1; }
 echo "ok    positive control: a 600 pin yields no 100 stanza"
+
+# A passthrough package competes on version alone, so it has to sit in the 500
+# stanza and nowhere above it: at 600 it would shadow the original publisher,
+# named in neither it would fall to the -1 catch-all and stop installing.
+if [ -n "$PT" ]; then
+    pin500=$(awk '/^Package: /{ p = substr($0, 10) }
+                  /^Pin-Priority: 500$/{ print p }' /etc/apt/preferences.d/diamondinoia)
+    pin600=$(awk '/^Package: /{ p = substr($0, 10) }
+                  /^Pin-Priority: 600$/{ print p }' /etc/apt/preferences.d/diamondinoia)
+    for p in $PT; do
+        [[ " $pin500 " == *" $p "* ]] ||
+            { echo "FAIL  $p is passthrough but not pinned at 500"; exit 1; }
+        [[ " $pin600 " == *" $p "* ]] &&
+            { echo "FAIL  $p is passthrough but also pinned at 600"; exit 1; }
+    done
+    echo "ok   $PT pinned at 500"
+fi
 # Positive control: a package whose pinned hash is wrong must refuse to install.
 # Without it a passing run cannot be told apart from a postinst that checks
 # nothing. The payload is local, so the control costs no download.
