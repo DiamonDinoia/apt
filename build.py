@@ -77,19 +77,27 @@ def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=True, **kw)
 
 
+# One read per release, not per package: two packages pinned to the same
+# release (juno-drivers and juno-drivers-diamon, whose exact-version Depends
+# binds them) must not straddle a re-publish by resolving seconds apart.
+_RELEASES: dict[str, dict] = {}
+
+
 def resolve(name: str, spec: dict) -> dict:
     """Current version, payload URL and, where the publisher gives one, its hash."""
     if "repo" in spec:
         endpoint = (f"{API}/repos/{spec['repo']}/releases/tags/{spec['tag']}"
                     if "tag" in spec
                     else f"{API}/repos/{spec['repo']}/releases/latest")
-        try:
-            with urllib.request.urlopen(http(endpoint)) as r:
-                release = json.load(r)
-        except urllib.error.HTTPError as e:
-            raise SystemExit(f"{name}: {endpoint} returned {e.code}"
-                             + (f"; run mirror.sh to populate the {spec['tag']!r} "
-                                "release" if "tag" in spec else "")) from None
+        if endpoint not in _RELEASES:
+            try:
+                with urllib.request.urlopen(http(endpoint)) as r:
+                    _RELEASES[endpoint] = json.load(r)
+            except urllib.error.HTTPError as e:
+                raise SystemExit(f"{name}: {endpoint} returned {e.code}"
+                                 + (f"; run mirror.sh to populate the {spec['tag']!r} "
+                                    "release" if "tag" in spec else "")) from None
+        release = _RELEASES[endpoint]
         rx = re.compile(spec["asset"])
         matches = [a for a in release["assets"] if rx.match(a["name"])]
         if not matches:
@@ -156,11 +164,18 @@ def resolve(name: str, spec: dict) -> dict:
     }
 
 
-def fetch(info: dict) -> Path:
+def fetch(info: dict, *, expected: str | None = None) -> Path:
     DL.mkdir(exist_ok=True)
     path = DL / info["source"]
     if path.exists() and path.stat().st_size > 0:
-        return path
+        if expected is None or sha256_of(path) == expected:
+            return path
+        # A publisher that re-uploads under an unmoved name (the fork's CI
+        # clobbers the asset whenever only the packaging changed) leaves the
+        # cache holding yesterday's bytes, and --clobber over 30-day eviction
+        # means the mismatch would fail every build for a month.
+        print(f"  refetch {info['source']} (cached bytes no longer match)")
+        path.unlink()
     print(f"  fetch   {info['url']}")
     tmp = path.with_suffix(path.suffix + ".part")
     with urllib.request.urlopen(http(info["url"])) as r, tmp.open("wb") as f:
@@ -275,7 +290,7 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
     # when the publisher offers no checksum. Either way the payload stays in the
     # cache and nothing of it enters the package.
     if sha is None or spec["install"] == "deb":
-        payload = fetch(info)
+        payload = fetch(info, expected=sha)
         measured = sha256_of(payload)
         if sha is not None and sha != measured:
             raise SystemExit(
@@ -351,7 +366,7 @@ def passthrough(name: str, info: dict) -> None:
     digest the publisher reported and the deb's own control data names the
     package and version packages.toml resolved.
     """
-    payload = fetch(info)
+    payload = fetch(info, expected=info["sha256"])
     measured = sha256_of(payload)
     if info["sha256"] is not None and info["sha256"] != measured:
         raise SystemExit(
