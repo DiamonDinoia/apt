@@ -39,7 +39,7 @@ provide, so it can never shadow Debian:
 
     Package: diamondinoia-apt diamondinoia-repo-cuda diamondinoia-repo-juno act
      lazygit stylua galaxybudsclient ghostty discord zoom clion zed watchexec
-     difftastic lua-language-server juno-drivers juno-drivers-local
+     difftastic lua-language-server juno-drivers juno-drivers-diamon
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
@@ -138,8 +138,9 @@ the deb's own maintainer scripts, so instead the asset the fork's CI published
 is served bit-identical. The build fetches it, fails unless the hash matches
 the digest the release reported, and fails unless the deb's own `Package:` and
 `Version:` match what the asset name promised. `tag`, `asset` and `version_re`
-name the release; nothing else is needed. `test_install.sh` skips passthrough
-packages, because the fork that built them already install-tested them.
+name the release; `with` lists packages `test_install.sh` installs first
+(typically this repository's own source package), so the container walks the
+same path a user walks.
 
 Add `defer_to_debian = true` for a package that carries a name Debian will
 eventually use itself. It moves out of the 600 pin into the 100 one, so Debian
@@ -173,12 +174,12 @@ only means anything against the archive the packages target.
 
 `test_install.sh` runs the real thing in a clean `debian:sid` container. It
 installs the bootstrap package, points the source at the freshly built
-repository, and installs every package with signature verification left on —
-every one that can run there, that is: passthrough packages are skipped by
-name, because the fork that builds them installs them in a container of its own
-and repeating it here adds nothing. Each one has to end up configured with its
-payload on disk, which is the only check that catches a `postinst` that runs
-and does nothing. Its positive control
+repository, and installs every package with signature verification left on.
+Passthrough packages walk the path a user walks: the bootstrap, any packages
+their spec's `with` names, then a real `apt-get install` — their fork's CI has
+already proven the heavy install; this proves the repository serves them
+correctly. Each one has to end up configured with its payload on disk, which is
+the only check that catches a `postinst` that runs and does nothing. Its positive control
 installs a package whose pinned hash is wrong and fails the run if `dpkg`
 accepts it. Give it package names to test a subset; with none it tests all of
 them, which downloads a few gigabytes.
@@ -328,7 +329,7 @@ name, so the name can never disagree with the compiler inside it.
 
 ## The exception: juno-drivers
 
-`juno-drivers` and `juno-drivers-local` are Juno Computers' own driver packages,
+`juno-drivers` and `juno-drivers-diamon` are Juno Computers' own driver packages,
 maintained in
 [DiamonDinoia/juno-drivers-debian](https://github.com/DiamonDinoia/juno-drivers-debian),
 a fork that carries local fixes on top of Juno's packaging. The fork's CI
@@ -343,11 +344,23 @@ the packages the fork builds are released this way; Juno's unmodified packages
 (`juno-info`, the wallpapers and so on) keep coming from Juno's repository,
 which `diamondinoia-repo-juno` adds.
 
-The fork versions its builds `0.5.48+localN`, which sorts above Juno's
+The fork versions its builds `0.5.48.1+diamonN`, which sorts above Juno's
 `0.5.48~debian`, so the fork wins on version alone; the 600 pin settles any
 doubt. A daily workflow in the fork watches Juno's changelog and opens an issue
 when a new upstream release lands, which is the signal to rebase and bump the
-local suffix.
+diamon suffix.
+
+`juno-info` and `check-battery`, which only Juno publishes, are in
+`juno-drivers`' `Depends`, so the install is
+
+    sudo apt-get install diamondinoia-repo-juno
+    sudo apt-get install juno-drivers
+
+and `test_install.sh` walks exactly that path in a container. The renames were
+`0.5.48+localN` → `0.5.48.1+diamonN` and `juno-drivers-local` →
+`juno-drivers-diamon`; the new package Conflicts/Replaces the old, so
+installing it swaps the pair. `+diamon1` alone would have sorted below the
+installed `+local1`, which is what the `.1` in the upstream part is for.
 
 ## Signing key
 

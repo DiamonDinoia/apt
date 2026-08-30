@@ -45,23 +45,25 @@ if [[ $# -gt 0 ]]; then
 else
   want=$(awk '/^Package: /{if ($2 != "diamondinoia-apt") printf "%s ", $2}' "$repo/Packages")
 fi
-# A passthrough package was built and container-installed by the fork that
-# publishes it (juno-drivers installs a desktop stack and manages live systemd
-# units, which this container cannot do), so repeating the install here adds
-# nothing. It is named rather than silently absent, so a package that skips
-# everything always says so.
-skip=$(python3 -c "import tomllib
+# Passthrough packages need a different container than the wrapper flow. Their
+# fork already proved the heavy install (a desktop stack's worth of Depends);
+# what it cannot prove is the path a user takes through this repository: index,
+# pin, apt's acquire of a '+'-name asset, and any source packages spec['with']
+# names, installed the way a user would install them, which is also what makes
+# juno-drivers' juno-info and check-battery Depends resolvable here. Each line
+# is "pkg extra extra...".
+mapfile -t passthrough < <(python3 -c "import tomllib
 spec = tomllib.load(open('$root/packages.toml', 'rb'))
-print(' '.join(n for n, s in spec.items() if s.get('install') == 'passthrough'))")
-filtered=
+for n, s in spec.items():
+    if isinstance(s, dict) and s.get('install') == 'passthrough':
+        print(n, ' '.join(s.get('with', [])))")
+ptnames=
+for line in "${passthrough[@]}"; do ptnames="$ptnames ${line%% *}"; done
+wrappers=
 for pkg in $want; do
-  case " $skip " in
-    *" $pkg "*) echo "==> skip $pkg: passthrough, installed in a container by the fork's own CI" ;;
-    *) filtered="$filtered $pkg" ;;
-  esac
+  case "$ptnames " in *" $pkg "*) ;; *) wrappers="$wrappers $pkg" ;; esac
 done
-want=$filtered
-echo "==> installing: $want"
+echo "==> installing:$wrappers"
 
 # The source the bootstrap package installs points at GitHub, which does not yet
 # hold this build. Only the URI is rewritten; Signed-By stays, so apt still
@@ -186,9 +188,11 @@ exit $rc
 SCRIPT
 rc=$?
 
-for pkg in $want; do
+for pkg in $wrappers; do
   echo "==> $pkg"
+
   # From packages.toml rather than from the postinst, so a link the build drops
+  # fails here, before publication, instead of only in test_gcc17.sh after it.
   # fails here, before publication, instead of only in test_gcc17.sh after it.
   links=$(python3 -c "import tomllib
 spec = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))
@@ -292,6 +296,47 @@ for pkg in $WANT; do
     printf 'ok    %-18s %s\n' "$pkg" "$what"
 done
 
+exit $rc
+SCRIPT
+  [ $? -eq 0 ] || rc=1
+done
+
+# Each passthrough package gets the user path: the same bootstrap, the extras
+# the toml asks for (the repository's own source package, which is also what
+# makes Juno's juno-info resolvable), then the package itself by name.
+for line in ${passthrough[@]+"${passthrough[@]}"}; do
+  pkg=${line%% *}
+  case " $want " in *" $pkg "*) ;; *) continue ;; esac
+  extras=${line#"$pkg"}; extras=${extras# }
+  echo "==> $pkg"
+  "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" -e "EXTRAS=$extras" \
+      debian:sid bash -eo pipefail -s <<'SCRIPT'
+# Passthrough packages are hardware metapackages: half their Depends live in
+# contrib/non-free/non-free-firmware, which a stock sid image does not enable.
+sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' \
+    /etc/apt/sources.list.d/debian.sources
+apt-get update -qq
+apt-get install -y --no-install-recommends /repo/diamondinoia-apt_*.deb
+sed -i 's|^URIs: .*|URIs: file:///repo/|' /etc/apt/sources.list.d/diamondinoia.sources
+apt-get update -qq -o APT::Update::Error-Mode=any
+for e in $EXTRAS; do
+    apt-get install -y --no-install-recommends "$e"
+    apt-get update -qq -o APT::Update::Error-Mode=any
+done
+apt-get install -y --no-install-recommends "$WANT"
+
+rc=0
+dpkg-query -W -f '${Status}' "$WANT" | grep -F 'install ok installed' >/dev/null ||
+    { echo "FAIL  $WANT not configured"; exit 1; }
+files=0; missing=0
+while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    files=$((files + 1))
+    [ -e "$f" ] || missing=$((missing + 1))
+done < <(dpkg -L "$WANT")
+[ "$files" -gt 0 ] && [ "$missing" -eq 0 ] ||
+    { echo "FAIL  $WANT: $missing of $files files absent"; rc=1; }
+[ "$rc" -eq 0 ] && echo "ok    $WANT installed the way a user installs it, $files files"
 exit $rc
 SCRIPT
   [ $? -eq 0 ] || rc=1

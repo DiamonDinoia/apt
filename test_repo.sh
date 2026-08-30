@@ -57,6 +57,14 @@ done < <(awk '/^Package: /{p=$2} /^Version: /{print p, $2}' "$repo/Packages")
 # Check 2. A package carries no payload, only a URL and a hash, so the URL has
 # to answer and the hash has to be a hash. A HEAD follows the publisher's
 # redirects the same way the postinst curl does.
+# Which packages intentionally serve their own deb is a property of
+# packages.toml, not of whatever a postinst happens to contain: a wrapper that
+# lost its pinned download must still fail here, and sniffing the script would
+# mistake that loss for a passthrough package.
+pt=" $(python3 -c "import tomllib
+spec = tomllib.load(open('packages.toml', 'rb'))
+print(' '.join(n for n, s in spec.items()
+               if isinstance(s, dict) and s.get('install') == 'passthrough'))") "
 for deb in "$repo"/*.deb; do
   pkg=$(dpkg-deb -f "$deb" Package)
   # A package with no postinst carries its own files and pins no payload, which
@@ -66,11 +74,22 @@ for deb in "$repo"/*.deb; do
     continue
   fi
   url=$(sed -n "s/^curl -fsSL '\(.*\)' -o .*/\1/p" <<<"$script")
-  # A passthrough package has a postinst that is the payload's own, and pins no
-  # URL: the deb itself is served, and the fork that built it installed it in a
-  # container. The signed index binds its bytes.
-  if [ -z "$url" ]; then
+  case "$pt" in
+  *" $pkg "*)
+    # A passthrough deb pins no URL: the bytes are served, and the signed index
+    # binds them. Its postinst is the payload's own.
+    if [ -n "$url" ]; then
+      printf 'FAIL  %-18s is passthrough but its postinst pins a payload\n' "$pkg"
+      fail=1
+      continue
+    fi
     printf 'ok    %-18s serves its own deb, built and tested by its fork\n' "$pkg"
+    continue
+    ;;
+  esac
+  if [ -z "$url" ]; then
+    printf 'FAIL  %-18s is no passthrough package but its postinst pins no payload\n' "$pkg"
+    fail=1
     continue
   fi
   sha=$(sed -n "s/^echo '\([0-9a-f]*\)  '.*/\1/p" <<<"$script")

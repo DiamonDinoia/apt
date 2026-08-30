@@ -161,19 +161,23 @@ section = "devel"
 install = "passthrough"
 repo = "DiamonDinoia/juno-drivers-debian"
 tag = "builds"
-asset = '^juno-drivers_[0-9.]+\+local[0-9]+_amd64\.deb$'
-version_re = '^juno-drivers_(.+)_amd64\.deb$'
+asset = '^juno-drivers_[^_]+_amd64\.deb$'
+version_re = '^juno-drivers_([^_]+)_amd64\.deb$'
+# juno-info and check-battery resolve from Juno's own repository, so the
+# container test installs the source package first, exactly as a user would.
+with = ["diamondinoia-repo-juno"]
 description = "Debian drivers for Juno Computers, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
-# juno-drivers-local is the fork's addition: GRUB cmdline and CPU turbo policy
+# juno-drivers-diamon is the fork's addition: GRUB cmdline and CPU turbo policy
 # for the machine's own Juno model.
-[juno-drivers-local]
+[juno-drivers-diamon]
 install = "passthrough"
 repo = "DiamonDinoia/juno-drivers-debian"
 tag = "builds"
-asset = '^juno-drivers-local_[0-9.]+\+local[0-9]+_amd64\.deb$'
-version_re = '^juno-drivers-local_(.+)_amd64\.deb$'
+asset = '^juno-drivers-diamon_[^_]+_amd64\.deb$'
+version_re = '^juno-drivers-diamon_([^_]+)_amd64\.deb$'
+with = ["diamondinoia-repo-juno"]
 description = "Local Juno GRUB and CPU policy integration, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
