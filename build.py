@@ -405,6 +405,11 @@ def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
         for p in debian.rglob("*"):
             if not p.is_file():
                 continue
+            # dpkg generates md5sums when a deb is built, so it exists only on
+            # the published side of the comparison and would read as a change
+            # on every single build — a serial that ratchets nightly.
+            if p.name == "md5sums":
+                continue
             content = p.read_bytes()
             if p.name == "control":
                 content = b"".join(l for l in content.splitlines(keepends=True)
@@ -498,21 +503,28 @@ def repo_package(name: str, spec: dict) -> None:
     add_repo(tree, name, spec)
 
     conffiles(tree)
+    # control has to exist before content_version reads the tree: missing on
+    # one side and present on the other would read as a change on every build.
+    # The Version line is where the computed version lands at the end, and is
+    # stripped from both sides of the comparison.
+    def control(version: str) -> str:
+        return (
+            f"Package: {pkg}\n"
+            f"Version: {version}\n"
+            "Architecture: all\n"
+            f"Maintainer: {MAINTAINER}\n"
+            "Depends: apt, ca-certificates\n"
+            "Section: admin\n"
+            "Priority: optional\n"
+            "Homepage: https://github.com/DiamonDinoia/apt\n"
+            f"Description: {spec['description']}\n"
+            f" Installs {spec['key']} and the matching source entry. The key is\n"
+            " pinned by SHA-256 at build time, so a rotated key fails the build\n"
+            " rather than reaching a machine unchecked.\n"
+        )
+    (tree / "DEBIAN/control").write_text(control("0"))
     version = content_version(pkg, tree, spec["key_sha256"][:8])
-    (tree / "DEBIAN/control").write_text(
-        f"Package: {pkg}\n"
-        f"Version: {version}\n"
-        "Architecture: all\n"
-        f"Maintainer: {MAINTAINER}\n"
-        "Depends: apt, ca-certificates\n"
-        "Section: admin\n"
-        "Priority: optional\n"
-        "Homepage: https://github.com/DiamonDinoia/apt\n"
-        f"Description: {spec['description']}\n"
-        f" Installs {spec['key']} and the matching source entry. The key is\n"
-        " pinned by SHA-256 at build time, so a rotated key fails the build\n"
-        " rather than reaching a machine unchecked.\n"
-    )
+    (tree / "DEBIAN/control").write_text(control(version))
     run(["dpkg-deb", "--root-owner-group", "--build", str(tree),
          str(OUT / f"{pkg}_{version}_all.deb")])
     shutil.rmtree(tree)
@@ -577,33 +589,42 @@ def bootstrap(specs: dict, repos: dict, key: str) -> None:
            "Pin-Priority: 100\n" if defer else "")
     )
 
-    conffiles(tree)
-    version = content_version(BOOTSTRAP, tree, key[-8:].lower(), FLOOR)
-    # 1.6 and older shipped the pin as a conffile. Removing it from the list is
-    # not enough: a machine whose pin drifted keeps the drift across the
-    # upgrade, quietly vetoing every later pin change. rm_conffile on
-    # preinst removes an untouched pin and moves a touched one to .dpkg-bak,
-    # so the shipped pin is always what the new version installs.
+    # 1.6 was the last published build that shipped the pin as a conffile, so
+    # the bound is that version, not today's: rm_conffile on preinst removes an
+    # untouched pin and moves a touched one to .dpkg-bak on every upgrade from
+    # anything older. Removing it from the list is not enough: a machine whose
+    # pin drifted would keep the drift across the upgrade, quietly vetoing
+    # every later pin change. A bound of the current version would also make
+    # this file differ on every build and ratchet the serial nightly.
     preinst = tree / "DEBIAN/preinst"
     preinst.write_text(
         "#!/bin/sh\n"
         f'dpkg-maintscript-helper rm_conffile "/etc/apt/preferences.d/{LABEL}" '
-        f'"{version}~" "{BOOTSTRAP}" -- "$@"\n')
+        f'"1.6~" "{BOOTSTRAP}" -- "$@"\n')
     preinst.chmod(0o755)
-    (tree / "DEBIAN/control").write_text(
-        f"Package: {BOOTSTRAP}\n"
-        f"Version: {version}\n"
-        "Architecture: all\n"
-        f"Maintainer: {MAINTAINER}\n"
-        "Depends: apt, ca-certificates\n"
-        "Section: admin\n"
-        "Priority: optional\n"
-        "Homepage: https://github.com/DiamonDinoia/apt\n"
-        "Description: apt source for the DiamonDinoia repository\n"
-        " Installs the signing key, the source entry and a pin that confines\n"
-        " this repository to the packages it is meant to provide, together\n"
-        " with the third-party sources a workstation needs anyway.\n"
-    )
+    conffiles(tree)
+    # control has to exist before content_version reads the tree: missing on
+    # one side and present on the other would read as a change on every build.
+    # The Version line is where the computed version lands at the end, and is
+    # stripped from both sides of the comparison.
+    def control(version: str) -> str:
+        return (
+            f"Package: {BOOTSTRAP}\n"
+            f"Version: {version}\n"
+            "Architecture: all\n"
+            f"Maintainer: {MAINTAINER}\n"
+            "Depends: apt, ca-certificates\n"
+            "Section: admin\n"
+            "Priority: optional\n"
+            "Homepage: https://github.com/DiamonDinoia/apt\n"
+            "Description: apt source for the DiamonDinoia repository\n"
+            " Installs the signing key, the source entry and a pin that confines\n"
+            " this repository to the packages it is meant to provide, together\n"
+            " with the third-party sources a workstation needs anyway.\n"
+        )
+    (tree / "DEBIAN/control").write_text(control("0"))
+    version = content_version(BOOTSTRAP, tree, key[-8:].lower(), FLOOR)
+    (tree / "DEBIAN/control").write_text(control(version))
     run(["dpkg-deb", "--root-owner-group", "--build", str(tree),
          str(OUT / f"{BOOTSTRAP}_{version}_all.deb")])
     shutil.rmtree(tree)
