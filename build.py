@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """Build a flat, signed apt repository of installer packages.
 
-No package here carries an upstream payload. Each one is a few kilobytes of
+No wrapper package carries an upstream payload. Each one is a few kilobytes of
 maintainer script whose postinst downloads the file from the publisher and
 checks it against a SHA-256 pinned when the package was built. The published
 repository therefore stays tiny, and the bytes a user installs always come from
-the publisher, so no licence has to permit redistribution.
+the publisher, so no licence has to permit redistribution. The passthrough
+shape is the exception: it serves debs this project forks and builds itself,
+where there is nothing to license around.
 
-Three install shapes exist, chosen by `install` in packages.toml:
+Four install shapes exist, chosen by `install` in packages.toml:
 
-  deb     download a .deb and unpack it into /
-  member  download an archive and place one executable in /usr/bin
-  tree    download an archive and place the whole application in /opt
+  deb         download a .deb and unpack it into /
+  member      download an archive and place one executable in /usr/bin
+  tree        download an archive and place the whole application in /opt
+  passthrough serve a .deb from the fork it was built in, bit-identical
+
+The wrapper shapes drop a payload's own maintainer scripts. A package whose
+scripts matter (juno-drivers, modified in a fork of this project) is built and
+container-tested by that fork's CI and served here unchanged, still pinned to
+the digest the publisher reported for the asset.
 
 The hash comes from GitHub's release asset digest, or from a checksum file the
 publisher publishes beside the payload. Only when neither exists is the payload
@@ -334,6 +342,36 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
     shutil.rmtree(tree)
 
 
+def passthrough(name: str, info: dict) -> None:
+    """Serve a .deb built and tested by the fork that publishes it.
+
+    The wrapper shapes lose the payload's own maintainer scripts, which a
+    package running real install logic (juno-drivers) needs, so here the
+    payload is the package. The build stops unless the bytes hash to the
+    digest the publisher reported and the deb's own control data names the
+    package and version packages.toml resolved.
+    """
+    payload = fetch(info)
+    measured = sha256_of(payload)
+    if info["sha256"] is not None and info["sha256"] != measured:
+        raise SystemExit(
+            f"{name}: publisher's checksum {info['sha256']} does not match the "
+            f"payload ({measured})")
+
+    def field(f: str) -> str:
+        return subprocess.run(["dpkg-deb", "-f", str(payload), f],
+                              capture_output=True, text=True,
+                              check=True).stdout.strip()
+    if field("Package") != name or field("Version") != info["version"]:
+        raise SystemExit(
+            f"{name}: the deb says {field('Package')} {field('Version')}, but "
+            f"packages.toml resolved {name} {info['version']}")
+    if not re.fullmatch(r"[A-Za-z0-9._+-]+", info["source"]):
+        raise SystemExit(f"{name}: {info['source']!r} has characters a release "
+                         "host may rewrite")
+    shutil.copy(payload, OUT / info["source"])
+
+
 def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
     """The version of a configuration package, bumped when its files change.
 
@@ -561,6 +599,9 @@ def main() -> int:
     for name, spec in specs.items():
         info = resolve(name, spec)
         print(f"{name}: {info['version']}")
+        if spec.get("install") == "passthrough":
+            passthrough(name, info)
+            continue
         # GitHub rewrites characters it dislikes in a release asset name, and
         # `~` becomes `.`, which leaves the index pointing at a name that 404s.
         # The version keeps its `~`; only the file name is spelled safely.

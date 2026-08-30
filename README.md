@@ -5,10 +5,10 @@ that ship only as a GitHub release artifact under `apt` control, and replaces
 third-party repositories that either lag upstream or are run by somebody other
 than the vendor.
 
-Nothing upstream is redistributed, with one deliberate exception below. Every
-package is a few kilobytes of maintainer script: `postinst` downloads the file
-from the publisher and checks it against a SHA-256 pinned when the package was
-built. Thirteen packages and the signed index come to under 35 kB.
+Nothing upstream is redistributed, with two deliberate exceptions below. Every
+wrapper package is a few kilobytes of maintainer script: `postinst` downloads
+the file from the publisher and checks it against a SHA-256 pinned when the
+package was built.
 
 That is what makes proprietary software packageable here. Discord, Zoom and
 CLion forbid redistribution, and none of their bytes pass through this
@@ -39,7 +39,7 @@ provide, so it can never shadow Debian:
 
     Package: diamondinoia-apt diamondinoia-repo-cuda diamondinoia-repo-juno act
      lazygit stylua galaxybudsclient ghostty discord zoom clion zed watchexec
-     difftastic lua-language-server
+     difftastic lua-language-server juno-drivers juno-drivers-local
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
@@ -82,6 +82,14 @@ A machine carrying the old source can drop it:
 
     sudo rm /etc/apt/sources.list.d/cuda-debian12-x86_64.sources
 
+A machine that already carries Juno's repository by hand can likewise drop its
+copy in favour of the pinned one this package installs:
+
+    sudo rm /etc/apt/sources.list.d/juno-debian.sources /etc/apt/keyrings/juno.gpg
+
+The second payload exception below belongs to the Juno source: the two
+packages the fork builds are also released here.
+
 The third stanza is for a package that only fills a gap until Debian fills it.
 At 100 it installs while Debian has no package of that name, and loses to
 Debian's own 500 the day Debian ships one, whatever the two versions are. A
@@ -94,7 +102,7 @@ they cannot verify.
 
 ## Add a package
 
-Append a block to `packages.toml`. `install` picks one of three shapes.
+Append a block to `packages.toml`. `install` picks one of four shapes.
 
 `install = "deb"` downloads an upstream `.deb` and unpacks it into `/`. The
 package's `Depends` is read off that `.deb` at build time, which is why a
@@ -119,9 +127,19 @@ an `asset` regex), a JSON feed (`json` plus `json_path` and `version_re`), or a
 URL that redirects to a versioned path (`url` plus `version_re`). GitHub tags
 have a leading `v` stripped. Adding `tag` reads a fixed release instead of the
 latest one; there several versions coexist as assets, so `version_re` extracts
-the version from the asset name and the greatest one is current. A `version_re`
-with two capture groups joins them with `~`, which makes a pre-release version
-that sorts below every real release of the same major.
+the version from the asset name and the greatest one is current, order compared
+with `dpkg --compare-versions`. A `version_re` with two capture groups joins
+them with `~`, which makes a pre-release version that sorts below every real
+release of the same major.
+
+`install = "passthrough"` is for a `.deb` this project forks and builds itself.
+The payload is the package: the three shapes above unpack or extract and lose
+the deb's own maintainer scripts, so instead the asset the fork's CI published
+is served bit-identical. The build fetches it, fails unless the hash matches
+the digest the release reported, and fails unless the deb's own `Package:` and
+`Version:` match what the asset name promised. `tag`, `asset` and `version_re`
+name the release; nothing else is needed. `test_install.sh` skips passthrough
+packages, because the fork that built them already install-tested them.
 
 Add `defer_to_debian = true` for a package that carries a name Debian will
 eventually use itself. It moves out of the 600 pin into the 100 one, so Debian
@@ -155,9 +173,12 @@ only means anything against the archive the packages target.
 
 `test_install.sh` runs the real thing in a clean `debian:sid` container. It
 installs the bootstrap package, points the source at the freshly built
-repository, and installs every package with signature verification left on. Each
-one has to end up configured with its payload on disk, which is the only check
-that catches a `postinst` that runs and does nothing. Its positive control
+repository, and installs every package with signature verification left on —
+every one that can run there, that is: passthrough packages are skipped by
+name, because the fork that builds them installs them in a container of its own
+and repeating it here adds nothing. Each one has to end up configured with its
+payload on disk, which is the only check that catches a `postinst` that runs
+and does nothing. Its positive control
 installs a package whose pinned hash is wrong and fails the run if `dpkg`
 accepts it. Give it package names to test a subset; with none it tests all of
 them, which downloads a few gigabytes.
@@ -304,6 +325,29 @@ looking like the newer version of a compiler it is older than.
 The failure is loud rather than silent because `mirror.sh` reads the major out
 of the payload's `lib/gcc/<target>/<version>/` path and puts it in the asset
 name, so the name can never disagree with the compiler inside it.
+
+## The exception: juno-drivers
+
+`juno-drivers` and `juno-drivers-local` are Juno Computers' own driver packages,
+maintained in
+[DiamonDinoia/juno-drivers-debian](https://github.com/DiamonDinoia/juno-drivers-debian),
+a fork that carries local fixes on top of Juno's packaging. The fork's CI
+builds both `.deb`s, installs them in a clean `debian:sid` container, and
+publishes them as assets of its `builds` release.
+
+The wrapper shapes would drop the maintainer scripts that do the real work, so
+these packages serve that `.deb` itself, bit-identical: `packages.toml` resolves
+the newest asset on the release, and the build stops unless the bytes hash to
+the digest GitHub reported and the deb's own `Package:`/`Version:` match. Only
+the packages the fork builds are released this way; Juno's unmodified packages
+(`juno-info`, the wallpapers and so on) keep coming from Juno's repository,
+which `diamondinoia-repo-juno` adds.
+
+The fork versions its builds `0.5.48+localN`, which sorts above Juno's
+`0.5.48~debian`, so the fork wins on version alone; the 600 pin settles any
+doubt. A daily workflow in the fork watches Juno's changelog and opens an issue
+when a new upstream release lands, which is the signal to rebase and bump the
+local suffix.
 
 ## Signing key
 

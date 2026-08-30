@@ -4,7 +4,8 @@
 # Check 1: apt reads the index, and every package it advertises is visible to
 #          apt at the advertised version, coming from this repository.
 # Check 2: a package carries no payload, only a pinned URL and SHA-256, so the
-#          URL must still answer and the hash must be a hash.
+#          URL must still answer and the hash must be a hash. Passthrough
+#          packages carry their own deb; the signed index binds its bytes.
 # Check 3 (positive control): mutating Packages after Release was written must
 #          make apt reject the repository. Without it the checks above cannot be
 #          told apart from apt quietly ignoring an index it never read.
@@ -65,6 +66,13 @@ for deb in "$repo"/*.deb; do
     continue
   fi
   url=$(sed -n "s/^curl -fsSL '\(.*\)' -o .*/\1/p" <<<"$script")
+  # A passthrough package has a postinst that is the payload's own, and pins no
+  # URL: the deb itself is served, and the fork that built it installed it in a
+  # container. The signed index binds its bytes.
+  if [ -z "$url" ]; then
+    printf 'ok    %-18s serves its own deb, built and tested by its fork\n' "$pkg"
+    continue
+  fi
   sha=$(sed -n "s/^echo '\([0-9a-f]*\)  '.*/\1/p" <<<"$script")
 
   if [[ ${#sha} -ne 64 ]]; then

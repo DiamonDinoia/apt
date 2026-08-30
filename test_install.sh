@@ -5,7 +5,8 @@
 # the bootstrap package puts a usable source and key in place, apt verifies the
 # signed index against that key, and every postinst downloads its payload, sees
 # the hash match, and leaves the program on disk. A postinst that silently does
-# nothing fails here and nowhere else.
+# nothing fails here and nowhere else. Passthrough packages are the named
+# exception: the fork that builds them installs them in a container of its own.
 #
 # One container per package, never all of them at once. Installed together, a
 # dependency one package declares satisfies another that forgot to, and the
@@ -44,6 +45,22 @@ if [[ $# -gt 0 ]]; then
 else
   want=$(awk '/^Package: /{if ($2 != "diamondinoia-apt") printf "%s ", $2}' "$repo/Packages")
 fi
+# A passthrough package was built and container-installed by the fork that
+# publishes it (juno-drivers installs a desktop stack and manages live systemd
+# units, which this container cannot do), so repeating the install here adds
+# nothing. It is named rather than silently absent, so a package that skips
+# everything always says so.
+skip=$(python3 -c "import tomllib
+spec = tomllib.load(open('$root/packages.toml', 'rb'))
+print(' '.join(n for n, s in spec.items() if s.get('install') == 'passthrough'))")
+filtered=
+for pkg in $want; do
+  case " $skip " in
+    *" $pkg "*) echo "==> skip $pkg: passthrough, installed in a container by the fork's own CI" ;;
+    *) filtered="$filtered $pkg" ;;
+  esac
+done
+want=$filtered
 echo "==> installing: $want"
 
 # The source the bootstrap package installs points at GitHub, which does not yet
