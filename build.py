@@ -94,8 +94,19 @@ def resolve(name: str, spec: dict) -> dict:
                 # Two capture groups join with `~`, which dpkg sorts below
                 # everything, so a pre-release nightly of major N stays below
                 # every version the distribution could ship as that major.
-                return "~".join(re.search(spec["version_re"], a["name"]).groups())
-            asset = max(matches, key=ver)
+                m = re.search(spec["version_re"], a["name"])
+                if not m:
+                    raise SystemExit(
+                        f"{name}: version_re does not match asset {a['name']!r}")
+                return "~".join(m.groups())
+            # dpkg's own ordering, not lexicographic: on text compare "0.5.9"
+            # sorts above "0.5.48", which is wrong.
+            asset = matches[0]
+            for candidate in matches[1:]:
+                if subprocess.run(["dpkg", "--compare-versions",
+                                   ver(candidate), "gt", ver(asset)],
+                                  check=False).returncode == 0:
+                    asset = candidate
             version = ver(asset)
         else:
             asset = matches[0]
