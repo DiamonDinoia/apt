@@ -171,6 +171,22 @@ with = ["diamondinoia-repo-juno"]
 description = "Juno drivers with local GRUB and CPU policy, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
+# The fan stack for the same laptops, from DiamonDinoia/juno-kde-fancontrol,
+# whose CI builds the deb through the full container gate (unit tests,
+# privileged-helper integration, install verification, offscreen renders) and
+# attaches it to its `builds` release. Passthrough for the same reason as
+# juno-drivers-diamon: the postinst (shadowing warning, daemon-reload) is part
+# of the package, so the deb is served bit-identical, pinned to the digest
+# GitHub reports.
+[juno-kde-fancontrol]
+install = "passthrough"
+repo = "DiamonDinoia/juno-kde-fancontrol"
+tag = "builds"
+asset = '^juno-kde-fancontrol_[^_]+_all\.deb$'
+version_re = '^juno-kde-fancontrol_([^_]+)_all\.deb$'
+description = "fan control and system monitor for Juno (Clevo) laptops"
+homepage = "https://github.com/DiamonDinoia/juno-kde-fancontrol"
+
 [gcc-17]
 install = "tree"
 repo = "DiamonDinoia/apt"
