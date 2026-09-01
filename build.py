@@ -49,6 +49,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+# A rebuild of unchanged content must produce unchanged bytes: the publish step
+# skips assets whose digest still matches, and dpkg-deb's ar/tar members carry
+# build-time mtimes unless pinned. A republish that only moves mtimes would
+# otherwise invalidate every cached index until its next apt update.
+os.environ.setdefault("SOURCE_DATE_EPOCH", "0")
+
 ROOT = Path(__file__).parent
 DL = ROOT / "dl"       # payloads fetched only to be hashed, cached between runs
 OUT = ROOT / "out"     # what is published: installer .debs and the signed index

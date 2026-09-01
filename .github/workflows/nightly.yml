@@ -81,9 +81,25 @@ jobs:
           have=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
           want=$(cd out && ls)
 
-          # Every asset is a few kilobytes, so there is nothing to gain from
-          # uploading selectively.
-          gh release upload "$RELEASE_TAG" out/* --clobber
+          # Upload only what changed. An asset re-uploaded at the same version
+          # with new bytes invalidates every cached index until its next apt
+          # update (the deb hashes Packages names no longer match the served
+          # bytes), so unchanged assets are left alone; the debs are now
+          # byte-stable under SOURCE_DATE_EPOCH. The signed index assets always
+          # change; apt refetches them atomically, so that pairing is safe.
+          mapfile -t remotes < <(gh release view "$RELEASE_TAG" --json assets \
+            --jq '.assets[] | .name + " " + .digest')
+          for f in out/*; do
+            name=${f##*/}
+            remote=$(printf '%s\n' ${remotes[@]+"${remotes[@]}"} | awk -v n="$name" '$1 == n {print $2}')
+            local_sha="sha256:$(sha256sum "$f" | cut -d' ' -f1)"
+            if [[ $remote == "$local_sha" ]]; then
+              echo "unchanged $name"
+            else
+              echo "upload $name"
+              gh release upload "$RELEASE_TAG" "$f" --clobber
+            fi
+          done
 
           for f in $have; do
             grep -qxF "$f" <<<"$want" ||
