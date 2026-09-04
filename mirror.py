@@ -57,7 +57,7 @@ the payload: gcc via lib/gcc/<target>/<ver>/, clang via
 lib/clang/<major>/ (measured: lib/clang/24/ in the clang-trunk
 payload). Matching of family members and extraction of {date}/{major}
 goes through the family's OWN rename regex (named groups) — never a
-positional or end-anchored date guess: 7 of the 9 rename schemes put
+positional or end-anchored date guess: 6 of the 9 rename schemes put
 the triplet/arch after the date, where a date-anchored-at-end match
 finds nothing and crashes (attempt 1, defect A). A new date
 re-records the row without alarm; dated assets beyond the newest two
@@ -515,7 +515,7 @@ def prune_plan(dated_assets: list[str], rx: re.Pattern,
                keep: int = KEEP_DATED) -> list[str]:
     """Release asset names of one family beyond the newest `keep`, oldest
     first. Each asset's date comes from the FAMILY's rename regex named
-    group — never a positional/end-anchored guess: 7 of the 9 schemes
+    group — never a positional/end-anchored guess: 6 of the 9 schemes
     carry text after the date, where an anchored guess finds nothing.
     Every member must match rx: a foreign asset in the plan is a caller
     bug and must fail loudly."""
@@ -1113,7 +1113,7 @@ def cmd_selftest() -> int:
 
     # ---------------- prune keep-two over EVERY family's rename scheme
     # (defect A control: date and major always come out of the family's own
-    # regex named groups; 7 of 9 schemes put text after the date)
+    # regex named groups; 6 of 9 schemes put text after the date)
     families = catalog["trunk_families"]
     expect("catalog carries the nine trunk families", len(families) == 9,
            str(sorted(families)))
