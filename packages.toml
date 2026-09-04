@@ -187,62 +187,13 @@ version_re = '^juno-kde-fancontrol_([^_]+)_all\.deb$'
 description = "fan control and system monitor for Juno (Clevo) laptops"
 homepage = "https://github.com/DiamonDinoia/juno-kde-fancontrol"
 
-[gcc-17]
-install = "tree"
-repo = "DiamonDinoia/apt"
-tag = "mirror"
-# The major is pinned here on purpose. The day trunk becomes 18 no asset
-# matches and the build stops with the new name in the error, which is the
-# signal to add a [gcc-18] block and retire this one.
-asset = '^gcc-17-trunk[0-9]{8}\.tar\.xz$'
-version_re = 'gcc-(17)-(trunk[0-9]{8})\.tar\.xz'
-defer_to_debian = true
-# A compiler without the C library headers cannot compile anything, and
-# Debian's own gcc-NN depends on libc6-dev for the same reason. libxml2 is what
-# the nine libgcobol objects link against, so gcobol-17 cannot link without it;
-# Debian's libgcobol1 carries the same dependency.
-depends = "libc6, libc6-dev, libxml2"
-strip = 2
-launcher = ["bin/gcc"]
-section = "devel"
-homepage = "https://gcc.gnu.org"
-description = "GCC 17 pre-release, built nightly by Compiler Explorer, mirrored here"
-license = "GPL-3.0-or-later with GCC Runtime Library Exception"
-
-# Debian's own naming, so a script written for gcc-17 keeps working after the
-# distribution takes the name over. `go` and `gofmt` are deliberately absent:
-# they are Go programs linked against the payload's libgo, so they exit 127
-# outside a loader path this package does not set. The bundled binutils are
-# absent too, because the driver finds them itself and Debian's gcc-NN does not
-# put them in PATH either.
-[gcc-17.links]
-"g++-17" = "bin/g++"
-"cpp-17" = "bin/cpp"
-"gfortran-17" = "bin/gfortran"
-"gcc-ar-17" = "bin/gcc-ar"
-"gcc-nm-17" = "bin/gcc-nm"
-"gcc-ranlib-17" = "bin/gcc-ranlib"
-"gcov-17" = "bin/gcov"
-"gcov-dump-17" = "bin/gcov-dump"
-"gcov-tool-17" = "bin/gcov-tool"
-"lto-dump-17" = "bin/lto-dump"
-"gccgo-17" = "bin/gccgo"
-"gdc-17" = "bin/gdc"
-"gm2-17" = "bin/gm2"
-"gccrs-17" = "bin/gccrs"
-"ga68-17" = "bin/ga68"
-"gcobol-17" = "bin/gcobol"
-"gcobc-17" = "bin/gcobc"
-"gnat-17" = "bin/gnat"
-"gnatbind-17" = "bin/gnatbind"
-"gnatchop-17" = "bin/gnatchop"
-"gnatclean-17" = "bin/gnatclean"
-"gnatkr-17" = "bin/gnatkr"
-"gnatlink-17" = "bin/gnatlink"
-"gnatls-17" = "bin/gnatls"
-"gnatmake-17" = "bin/gnatmake"
-"gnatname-17" = "bin/gnatname"
-"gnatprep-17" = "bin/gnatprep"
+# Compiler payloads (gcc/clang stables and trunk families) are not listed
+# here: build.py derives one bundle per catalog.json entry from the recorded
+# Debian naming shapes and mirror-manifest.json's per-payload analysis. The
+# gcc-17 wrapper that used to live here became the catalog's gcc-trunk bundle;
+# the major is pinned by the rename scheme the mirror applies, and the day
+# trunk becomes 18 the bundle is named gcc-18 by the same catalog machinery
+# that stops the mirror (`no asset matches ...; have: gcc-18-trunk...`).
 
 # Third-party apt sources this repository sets up, so a fresh machine needs one
 # install rather than ten hand-written files. Each key is fetched at build time

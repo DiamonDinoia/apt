@@ -28,7 +28,6 @@ engine=$(command -v podman || command -v docker) || {
 if [[ -z ${GPG_KEY_ID:-} ]]; then
   echo "==> GPG_KEY_ID unset, building with a throwaway key"
   gnupg=$(mktemp -d); chmod 700 "$gnupg"
-  trap 'rm -rf "$gnupg"' EXIT
   export GNUPGHOME=$gnupg
   gpg --batch --pinentry-mode loopback --passphrase '' \
       --quick-generate-key 'apt test <test@invalid>' rsa3072 sign never ||
@@ -40,10 +39,22 @@ fi
 
 [[ -f $repo/InRelease ]] || { echo "FAIL  $repo is not signed"; exit 1; }
 
+# The merged spec is the single test interface: wrapper shapes and `with`,
+# bundle markers (install == "bundle"), defer groups and repos all read here.
+spec=$(mktemp)
+trap 'rm -f "$spec"; [ -n "${gnupg:-}" ] && rm -rf "$gnupg"' EXIT
+python3 "$root/build.py" --dump-spec > "$spec"
+
 if [[ $# -gt 0 ]]; then
   want="$*"
 else
-  want=$(awk '/^Package: /{if ($2 != "diamondinoia-apt") printf "%s ", $2}' "$repo/Packages")
+  # Default: every advertiseable package EXCEPT compiler bundles (heavy
+  # payloads; S4/S5 own their container tests).
+  want=$(python3 -c "import json
+s = json.load(open('$spec'))
+bundles = {n for n, b in s['bundles'].items() if b.get('install') == 'bundle'}
+names = [l.split()[1] for l in open('$repo/Packages') if l.startswith('Package: ')]
+print(' '.join(n for n in names if n != 'diamondinoia-apt' and n not in bundles))")
 fi
 # Passthrough packages need a different container than the wrapper flow. Their
 # fork already proved the heavy install (a desktop stack's worth of Depends);
@@ -52,11 +63,11 @@ fi
 # names, installed the way a user would install them, which is also what makes
 # juno-drivers' juno-info and check-battery Depends resolvable here. Each line
 # is "pkg extra extra...".
-mapfile -t passthrough < <(python3 -c "import tomllib
-spec = tomllib.load(open('$root/packages.toml', 'rb'))
-for n, s in spec.items():
-    if isinstance(s, dict) and s.get('install') == 'passthrough':
-        print(n, ' '.join(s.get('with', [])))")
+mapfile -t passthrough < <(python3 -c "import json
+s = json.load(open('$spec'))
+for n, w in s['wrappers'].items():
+    if w.get('install') == 'passthrough':
+        print(n, ' '.join(w.get('with', [])))")
 ptnames=
 for line in "${passthrough[@]}"; do ptnames="$ptnames ${line%% *}"; done
 wrappers=
@@ -68,11 +79,22 @@ echo "==> installing:$wrappers"
 # The source the bootstrap package installs points at GitHub, which does not yet
 # hold this build. Only the URI is rewritten; Signed-By stays, so apt still
 # verifies the index against the key the bootstrap package installed.
-# Which packages defer to the distribution is a property of packages.toml, so
-# the check reads it there instead of naming gcc-17 in a second place.
-defer=$(awk '/^\[/{ p=substr($0, 2, length($0) - 2) }
-             /^defer_to_debian *= *true/{ printf "%s ", p }' \
-        "$(dirname "$0")/packages.toml")
+# Which packages defer to the distribution is a property of the merged spec:
+# every catalog compiler bundle (emitted today or pending its mirror row —
+# the pin covers the name either way) plus any wrapper marked defer_to_debian.
+# The list must stay non-vacuous over compiler names, or the glob-stanza check
+# in the container proves nothing.
+defer=$(python3 -c "import json
+s = json.load(open('$spec'))
+out = [n for n, b in sorted(s['bundles'].items())
+       if b.get('pin') == 'defer' and ' (trunk family)' not in n]
+out += [n for n, w in s['wrappers'].items() if w.get('defer_to_debian')]
+print(' '.join(out))")
+defer_n=$(wc -w <<<"$defer")
+case " $defer " in *gcc-*|*clang-*) ;; *) echo "FAIL  defer list lost its compiler names"; exit 1;; esac
+if [ "$defer_n" -lt 9 ]; then
+  echo "FAIL  defer list covers $defer_n names, expected >= 9 compiler names"; exit 1
+fi
 
 # apt names a list file after the URI, with '_' escaped as %5f and '/' turned
 # into '_', and inserts dists/<suite> for anything that is not a flat
@@ -80,10 +102,10 @@ defer=$(awk '/^\[/{ p=substr($0, 2, length($0) - 2) }
 # quietly loses one of its suites, which llvm has five of; grepping for the
 # host cannot tell one suite from five.
 indices() {           # $1: one repo name, or empty for every carried source
-    python3 -c "import tomllib, re, sys
+    python3 -c "import json, re, sys
 want = sys.argv[1]
 out = []
-for name, r in tomllib.load(open('$root/packages.toml', 'rb'))['repos'].items():
+for name, r in json.load(open('$spec'))['repos'].items():
     if not ((name == want) if want else not r.get('separate')):
         continue
     for uri in r['uris'].split():
@@ -145,23 +167,36 @@ apt-get update -qq -o APT::Update::Error-Mode=any
 # A package that defers to the distribution has to sit in the 100 stanza. At
 # 600 it outranks the archive and the handover never happens; named in neither
 # list it drops to the -1 catch-all and stops being installable at all. The
-# post-publish test reads the same pin, but only after users could have it.
+# 100 stanza now covers the compiler namespace with globs (gcc-*, clang-*), so
+# membership is a glob match, not a substring match. The post-publish test
+# reads the same pin, but only after users could have it.
 pin100=$(awk '/^Package: /{ p = substr($0, 10) }
               /^Pin-Priority: 100$/{ print p }' /etc/apt/preferences.d/diamondinoia)
 for p in $DEFER; do
-    [[ " $pin100 " == *" $p "* ]] ||
-        { echo "FAIL  $p defers to Debian but is not pinned at 100"; exit 1; }
-    echo "ok    $p is pinned at 100"
+    hit=
+    for tok in $pin100; do
+        [[ $p == $tok ]] && { hit=1; break; }
+    done
+    [ -n "$hit" ] ||
+        { echo "FAIL  $p defers to Debian but no 100-stanza token matches it"; exit 1; }
 done
+echo "ok    every defer name matches a 100-stanza token ($(wc -w <<<"$DEFER") names)"
 
 # Positive control: the same reader applied to a pin file that puts those
 # packages at 600 must come back empty, or the loop above proves nothing.
 [ -z "$(awk '/^Package: /{ p = substr($0, 10) }
-             /^Pin-Priority: 100$/{ print p }' <<<"Package: $DEFER
+             /^Pin-Priority: 100$/{ print p }' <<<"Package: gcc-99 clang-99
 Pin: release l=diamondinoia
 Pin-Priority: 600")" ] ||
     { echo "FAIL  positive control: the reader found a 100 stanza in a 600 pin"; exit 1; }
 echo "ok    positive control: a 600 pin yields no 100 stanza"
+# Negative half of the control set: the glob reader must NOT match a name
+# outside the compiler namespace, or containment is unverified.
+for tok in $pin100; do
+    [[ diamondinoia-apt == $tok ]] &&
+        { echo "FAIL  positive control: the glob stanza swallows the bootstrap package"; exit 1; }
+done
+echo "ok    positive control: the glob stanza does not swallow other packages"
 
 # A passthrough package competes on version alone, so it has to sit in the 500
 # stanza and nowhere above it: at 600 it would shadow the original publisher,
@@ -208,12 +243,13 @@ rc=$?
 for pkg in $wrappers; do
   echo "==> $pkg"
 
-  # From packages.toml rather than from the postinst, so a link the build drops
-  # fails here, before publication, instead of only in test_gcc17.sh after it.
-  # fails here, before publication, instead of only in test_gcc17.sh after it.
-  links=$(python3 -c "import tomllib
-spec = tomllib.load(open('$(dirname "$0")/packages.toml', 'rb'))
-print(' '.join(spec.get('$pkg', {}).get('links', {})))")
+  # From the merged spec rather than from the postinst, so a link the build
+  # drops fails here, before publication, instead of only in the post-publish
+  # tests. Compiler bundles pass this reader just like wrappers.
+  links=$(python3 -c "import json
+s = json.load(open('$spec'))
+w = s['wrappers'].get('$pkg') or s['bundles'].get('$pkg', {})
+print(' '.join(w.get('links', {})))")
   "$engine" run --rm -i -v "$repo:/repo:ro" -e "WANT=$pkg" -e "LINKS=$links" \
       -e "INDICES=$(indices "${pkg#diamondinoia-repo-}")" debian:sid \
       bash -eo pipefail -s <<'SCRIPT'

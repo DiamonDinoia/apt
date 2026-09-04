@@ -25,6 +25,12 @@ repo=$(cd "$(dirname "$0")" && pwd)/out
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# The merged spec is the single test interface for everything build.py derives:
+# wrapper shapes and pins, bundle links/exclusions/depends, repos. Offline.
+# Kept in a file: it is too large for argv/env.
+spec=$work/spec.json
+python3 "$(dirname "$0")/build.py" --dump-spec > "$spec"
+
 mkdir -p "$work"/{sources,lists/partial,archives/partial}
 cp /etc/apt/sources.list.d/* "$work/sources/" 2>/dev/null
 echo "deb [trusted=yes] file://$repo ./" > "$work/sources/zz-local.list"
@@ -57,14 +63,14 @@ done < <(awk '/^Package: /{p=$2} /^Version: /{print p, $2}' "$repo/Packages")
 # Check 2. A package carries no payload, only a URL and a hash, so the URL has
 # to answer and the hash has to be a hash. A HEAD follows the publisher's
 # redirects the same way the postinst curl does.
-# Which packages intentionally serve their own deb is a property of
-# packages.toml, not of whatever a postinst happens to contain: a wrapper that
-# lost its pinned download must still fail here, and sniffing the script would
-# mistake that loss for a passthrough package.
-pt=" $(python3 -c "import tomllib
-spec = tomllib.load(open('packages.toml', 'rb'))
-print(' '.join(n for n, s in spec.items()
-               if isinstance(s, dict) and s.get('install') == 'passthrough'))") "
+# Which packages intentionally serve their own deb is a property of the merged
+# spec, not of whatever a postinst happens to contain: a wrapper that lost its
+# pinned download must still fail here, and sniffing the script would mistake
+# that loss for a passthrough package.
+pt=" $(python3 -c "import json
+print(' '.join(n for n, w in json.load(open('$spec'))['wrappers'].items()
+               if w.get('install') == 'passthrough'))") "
+: > "$work/probes"
 for deb in "$repo"/*.deb; do
   pkg=$(dpkg-deb -f "$deb" Package)
   # A package with no postinst carries its own files and pins no payload, which
@@ -93,17 +99,24 @@ for deb in "$repo"/*.deb; do
     continue
   fi
   sha=$(sed -n "s/^echo '\([0-9a-f]*\)  '.*/\1/p" <<<"$script")
-
-  if [[ ${#sha} -ne 64 ]]; then
-    printf 'FAIL  %-18s pinned hash is %q, not a SHA-256\n' "$pkg" "$sha"
-    fail=1
-  elif ! code=$(curl -fsSLI -o /dev/null -w '%{http_code}' --max-time 30 "$url"); then
-    printf 'FAIL  %-18s payload unreachable: %s\n' "$pkg" "$url"
-    fail=1
-  else
-    printf 'ok    %-18s payload %s %s\n' "$pkg" "$code" "${sha:0:12}"
-  fi
+  printf '%s\0%s\0%s\0' "$pkg" "$url" "$sha" >> "$work/probes"
 done
+# The probes run in parallel; a bundle payload is a large file on the mirror,
+# and a HEAD answers from its headers alone. max-time is per probe, unchanged.
+xargs -0 -r -n 3 -P 8 bash -c '
+  pkg=$1 url=$2 sha=$3
+  if [[ ${#sha} -ne 64 ]]; then
+    printf "FAIL  %-18s pinned hash is %q, not a SHA-256\n" "$pkg" "$sha"
+    exit 1
+  fi
+  if ! code=$(curl -fsSLI -o /dev/null -w "%{http_code}" --max-time 30 "$url"); then
+    printf "FAIL  %-18s payload unreachable: %s\n" "$pkg" "$url"
+    exit 1
+  fi
+  printf "ok    %-18s payload %s %s\n" "$pkg" "$code" "${sha:0:12}"
+' _ < "$work/probes" > "$work/probe-out"
+sort "$work/probe-out"
+grep -q '^FAIL' "$work/probe-out" && fail=1
 
 # Positive control for check 2: the reachability probe must fail on a URL that
 # does not resolve, or a dead payload would pass unnoticed.
@@ -184,25 +197,53 @@ else
   echo "ok    positive control: an unmoved version does not satisfy gt"
 fi
 
-# Check 6: the README names every linked tool, so the list a reader copies from
-# has to be the list the package installs. Docs drift silently; a diff does not.
-# A table the regex fails to find reads as empty and reports all 28 names as
+# Check 6: the README names every linked tool and the exclusion accounting of
+# the gcc-17 payload (28 linked; 45 excluded as 27 bundled binutils/gprofng, 15
+# triplet aliases, 1 c++, 2 go/gofmt), so the spec a reader copies from has to
+# be the partition the bundle installs. Docs drift silently; a diff does not. A
+# table the regex fails to find reads as empty and reports all 28 names as
 # missing, so a broken parse cannot pass as agreement.
-if python3 - <<'DOC'; then
-import re, sys, tomllib
-links = tomllib.load(open("packages.toml", "rb"))["gcc-17"]["links"]
-table = re.search(r"\n    gcc-17 .*?\n\n", open("README.md").read(), re.S)
+if python3 - "$spec" <<'DOC'; then
+import json, re, sys
+from collections import Counter
+spec = json.load(open(sys.argv[1]))
+bundle = spec["bundles"]["gcc-17"]
+want = set(bundle["links"]) | {"gcc-17"}
+readme = open("README.md").read()
+table = re.search(r"\n    gcc-17 .*?\n\n", readme, re.S)
 listed = set(re.findall(r"\b[a-z+0-9-]+-17\b", table.group(0))) if table else set()
-want = set(links) | {"gcc-17"}
 for name in sorted(listed - want):
-    print(f"      the README lists {name}, which packages.toml does not link")
+    print(f"      the README lists {name}, which the spec does not link")
 for name in sorted(want - listed):
-    print(f"      packages.toml links {name}, which the README does not list")
-sys.exit(listed != want)
+    print(f"      the spec links {name}, which the README does not list")
+ok = listed == want and len(want) == 28
+# The README's exclusion prose is the oracle for the 45-name partition: the
+# numerals come from the text itself, so a prose rewrite that drops them fails
+# loudly rather than neutralising the check.
+classes = Counter(x["class"] for x in bundle["link_exclusions"].values())
+oracle = {}
+m = re.search(r"(\d+) are\s+the\s+bundled\s+binutils", readme)
+if m: oracle["bundled-binutils"] = int(m.group(1))
+m = re.search(r"(\d+) are\s+`?x86_64-linux-gnu-`?\s+aliases", readme)
+if m: oracle["triplet-alias"] = int(m.group(1))
+if re.search(r"[Oo]ne is `?c\+\+`?", readme): oracle["no-series-spelling"] = 1
+if re.search(r"two are `?go`? and `?gofmt`?", readme): oracle["go-libgo"] = 2
+if oracle != {"bundled-binutils": 27, "triplet-alias": 15,
+              "no-series-spelling": 1, "go-libgo": 2}:
+    print(f"      the README prose no longer states the 27/15/1/2 accounting: {oracle}")
+    ok = False
+if dict(classes) != oracle:
+    print(f"      spec exclusion classes {dict(classes)} != README oracle {oracle}")
+    ok = False
+total = len(bundle["links"]) + 1 + len(bundle["link_exclusions"])
+if total != 73:
+    print(f"      gcc-17 accounts for {total} bin/ names, expected 73")
+    ok = False
+sys.exit(not ok)
 DOC
-  echo "ok    the README table names exactly the $(($(grep -c '" = "bin/' packages.toml) + 1)) linked tools"
+  echo "ok    the README names exactly the spec's 28 linked tools, and its 27/15/1/2 exclusion oracle matches the spec"
 else
-  echo "FAIL  the README table and packages.toml disagree"; fail=1
+  echo "FAIL  the README and the spec disagree on the gcc-17 partition"; fail=1
 fi
 
 # Check 7: the README's install command must not name a version. It named
@@ -254,24 +295,89 @@ fi
 # reader who installs on that promise has to get them. The vscode source was
 # on the machine and in neither, so the list is exactly the kind of thing that
 # is wrong without anyone noticing.
-if python3 - <<'DOC'; then
-import re, sys, tomllib
-repos = tomllib.load(open("packages.toml", "rb"))["repos"]
+if python3 - "$spec" <<'DOC'; then
+import json, re, sys
+repos = json.load(open(sys.argv[1]))["repos"]
 want = {n for n, r in repos.items() if not r.get("separate")}
 block = re.search(r"with the keys\nthat verify them:\n\n((?:    .*\n)+)",
                   open("README.md").read())
 listed = set(block.group(1).split()) if block else set()
 for n in sorted(listed - want):
-    print(f"      the README names {n}, which packages.toml does not carry")
+    print(f"      the README names {n}, which the spec does not carry")
 for n in sorted(want - listed):
-    print(f"      packages.toml carries {n}, which the README does not name")
+    print(f"      the spec carries {n}, which the README does not name")
 sys.exit(not listed or listed != want)
 DOC
-  echo "ok    the README names the $(python3 -c "import tomllib
-r = tomllib.load(open('packages.toml','rb'))['repos']
-print(sum(1 for v in r.values() if not v.get('separate')))") carried sources"
+  echo "ok    the README names the $(python3 -c "import json
+print(sum(1 for v in json.load(open('$spec'))['repos'].values() if not v.get('separate')))") carried sources"
 else
-  echo "FAIL  the README and packages.toml disagree on the carried sources"; fail=1
+  echo "FAIL  the README and the spec disagree on the carried sources"; fail=1
+fi
+
+# Check 10: pin-aware policy. The bootstrap's preferences land in this apt
+# context, so priorities are the ones a user gets. Every emitted bundle name
+# must be offered by this repository, one representative compiler proves the
+# glob stanza sits at 100, and a name outside the index must show no offer
+# from us at all. Non-vacuity: the 100 stanza must cover at least one offered
+# name (an empty or never-matching stanza would satisfy every line vacuously).
+boot=$(cd "$repo" && echo diamondinoia-apt_*_all.deb)
+mkdir -p "$work/prefs"
+dpkg-deb --fsys-tarfile "$repo/$boot" |
+    tar -xO ./etc/apt/preferences.d/diamondinoia > "$work/prefs/diamondinoia" 2>/dev/null
+apt_p=(-o Dir::Etc::sourcelist=/dev/null
+      -o Dir::Etc::sourceparts="$work/sources"
+      -o Dir::State::lists="$work/lists"
+      -o Dir::Cache::archives="$work/archives"
+      -o Dir::Etc::preferences=/dev/null
+      -o Dir::Etc::preferencesparts="$work/prefs"
+      -o APT::Get::AllowUnauthenticated=true)
+rm -rf "$work/lists"; mkdir -p "$work/lists/partial"
+apt-get "${apt_p[@]}" update -qq 2>/dev/null
+
+# apt-cache policy prints one `  <version> <priority>` line followed by the
+# source lines for that version; ours is the one whose source is this repo,
+# and the glob stanza must put it at 100.
+n100=0
+while IFS=$'\t' read -r pkg ver; do
+  [ -n "$pkg" ] || continue
+  if apt-cache "${apt_p[@]}" policy "$pkg" |
+     awk -v ver="$ver" -v repo="$repo" '
+       $1 == ver && $2 ~ /^[0-9]+$/ { prio=$2; want=1; next }
+       want && $0 ~ repo { if (prio == 100) found=1; want=0 }
+       $2 ~ /^[0-9]+$/ && $1 != ver { want=0 }
+       END { exit !found }'; then
+    n100=$((n100 + 1))
+    printf 'ok    %-18s offered at 100 under the pin\n' "$pkg"
+  else
+    printf 'FAIL  %-18s not offered by this repository at pin 100\n' "$pkg"
+    apt-cache "${apt_p[@]}" policy "$pkg" | sed 's/^/         /'
+    fail=1
+  fi
+done < <(python3 -c "import json
+s = json.load(open('$spec'))
+for n, b in sorted(s['bundles'].items()):
+    if b.get('state') == 'emit':
+        print(n + chr(9) + b['version'])")
+
+if [ "$n100" -lt 1 ]; then
+  echo "FAIL  the 100 stanza covers no offered name (non-vacuity)"; fail=1
+else
+  echo "ok    the 100 stanza covers $n100 offered bundles"
+fi
+# Positive control: a name not in the index must show no offer from us.
+if apt-cache "${apt_p[@]}" policy gcc-99 2>/dev/null | grep -F "$repo" >/dev/null; then
+  echo "FAIL  positive control: gcc-99 shows an offer from this repository"
+  fail=1
+else
+  echo "ok    positive control: gcc-99 has no offer from us"
+fi
+
+# Check 11: the bundle rules' poison controls (denylist P/C/R, version-order
+# gate, soname table, the gcc-17 28/45 oracle) run offline in build.py.
+if python3 "$(cd "$(dirname "$0")" && pwd)/build.py" --selftest > "$work/selftest.log" 2>&1; then
+  echo "ok    bundle-rule selftest clean"
+else
+  echo "FAIL  bundle-rule selftest:"; cat "$work/selftest.log"; fail=1
 fi
 
 exit $fail
