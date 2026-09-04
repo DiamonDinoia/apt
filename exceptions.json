@@ -1,0 +1,132 @@
+{
+  "cutoff": {},
+  "relr": {
+    "10/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-10.5.0.tar.xz, series 10) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "10",
+      "works": null
+    },
+    "10/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-10.5.0.tar.xz, series 10) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "10",
+      "works": null
+    },
+    "11/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-11.5.0.tar.xz, series 11) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "11",
+      "works": null
+    },
+    "11/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-11.5.0.tar.xz, series 11) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "11",
+      "works": null
+    },
+    "16/sid": {
+      "baseline": "sid",
+      "measured": "2026-09-04",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 16.2.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.44) 2.44; libc6 2.43-4",
+      "series": "16",
+      "works": true
+    },
+    "16/trixie": {
+      "baseline": "trixie",
+      "measured": "2026-09-04",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 16.2.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.44) 2.44; libc6 2.41-12+deb13u3",
+      "series": "16",
+      "works": true
+    },
+    "17/sid": {
+      "baseline": "sid",
+      "measured": "2026-09-04",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 17.0.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc-313ca57ed380ac037fbbce6124af070a7bd27cb6-binutils-2.44) 2.44; libc6 2.43-4",
+      "series": "17",
+      "works": true
+    },
+    "17/trixie": {
+      "baseline": "trixie",
+      "measured": "2026-09-04",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 17.0.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc-313ca57ed380ac037fbbce6124af070a7bd27cb6-binutils-2.44) 2.44; libc6 2.41-12+deb13u3",
+      "series": "17",
+      "works": true
+    },
+    "5/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-5.5.0.tar.xz, series 5) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "5",
+      "works": null
+    },
+    "5/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-5.5.0.tar.xz, series 5) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "5",
+      "works": null
+    },
+    "6/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-renovated-6.5.0.tar.xz, series 6) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "6",
+      "works": null
+    },
+    "6/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-renovated-6.5.0.tar.xz, series 6) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "6",
+      "works": null
+    },
+    "7/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-7.5.0.tar.xz, series 7) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "7",
+      "works": null
+    },
+    "7/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-7.5.0.tar.xz, series 7) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "7",
+      "works": null
+    },
+    "8/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-8.5.0.tar.xz, series 8) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "8",
+      "works": null
+    },
+    "8/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-8.5.0.tar.xz, series 8) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "8",
+      "works": null
+    },
+    "9/sid": {
+      "baseline": "sid",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-9.5.0.tar.xz, series 9) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "series": "9",
+      "works": null
+    },
+    "9/trixie": {
+      "baseline": "trixie",
+      "measured": "pending-mirror",
+      "reason": "native gcc (asset gcc-9.5.0.tar.xz, series 9) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "series": "9",
+      "works": null
+    }
+  },
+  "schema": "exceptions.json: curated+measured bundle exceptions, canonical JSON (json.dumps(indent=2, sort_keys=True) + newline), one writer per section: test_failure_modes.sh owns 'relr' (rows keyed '<gcc series>/<baseline>': series 5-11 = the RELR era per E3, 16/17 = control rows outside it; row = {series, baseline, works (true|false|null), measured ('YYYY-MM-DD'|'pending-mirror'), reason}; works is null iff pending-mirror; works:false requires a non-empty evidence reason; pending rows name the unmirrored series and asset). 'cutoff' is reserved for S4 (clang <= 3.x C++ trials); S6 creates it empty and never writes it."
+}
