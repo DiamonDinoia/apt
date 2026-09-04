@@ -39,7 +39,7 @@ provide, so it can never shadow Debian:
 
     Package: diamondinoia-apt diamondinoia-repo-cuda diamondinoia-repo-juno act
      lazygit stylua galaxybudsclient ghostty discord zoom clion zed watchexec
-     difftastic lua-language-server
+     difftastic lua-language-server intel-sde
     Pin: release l=diamondinoia
     Pin-Priority: 600
 

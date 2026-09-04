@@ -231,6 +231,27 @@ def resolve(name: str, spec: dict) -> dict:
             "sha256": sha,
         }
 
+    if "text" in spec:
+        # A small text page (an AUR PKGBUILD, a changelog) as the version
+        # oracle when the publisher's own page is bot-blocked. Refetched every
+        # build like the JSON feeds; only payloads are cached. text_re's named
+        # groups drive both templates, and an oracle that changes shape fails
+        # loudly naming itself rather than pinning a stale version.
+        with urllib.request.urlopen(http(spec["text"])) as r:
+            body = r.read().decode()
+        match = re.search(spec["text_re"], body)
+        if not match:
+            raise SystemExit(f"{name}: {spec['text_re']!r} does not match "
+                             f"{spec['text']}")
+        groups = match.groupdict()
+        version = spec["version"].format(**groups)
+        if not re.fullmatch(r"[0-9][A-Za-z0-9.+~]*", version):
+            raise SystemExit(f"{name}: version {version!r} from {spec['text']} "
+                             "is not a dpkg upstream version")
+        url = spec["url"].format(**groups)
+        return {"version": version, "url": url,
+                "source": Path(url).name, "sha256": None}
+
     # A plain URL that redirects to a versioned path. HEAD is enough to learn
     # the version; the publisher offers no checksum, so one is computed below.
     with urllib.request.urlopen(http(spec["url"], method="HEAD")) as r:
