@@ -73,7 +73,7 @@ jobs:
           git commit -m "chore: mirror manifest after nightly sync"
           pushed=false
           for i in 1 2 3; do
-            if git pull --rebase origin main && git push; then
+            if git pull --rebase origin main && git push origin HEAD:main; then
               pushed=true
               break
             fi
