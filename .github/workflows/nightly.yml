@@ -43,11 +43,14 @@ jobs:
           echo "GPG_KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5; exit}')" >> "$GITHUB_ENV"
 
       # One download from the publisher per new version, ever; users and tests
-      # get the payload from the mirror release here.
-      - name: Mirror the gcc-trunk nightly
+      # get the payload from the mirror release here. mirror.py rotates new
+      # dated trunk nightlies into the release (keep-newest-two, catalog
+      # rename schemes), pacing its GitHub calls; --max 4 covers a normal
+      # day's rotations.
+      - name: Mirror the nightly payloads
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./mirror.sh
+        run: python3 mirror.py sync --max 4
 
       - name: Build repository
         env:
