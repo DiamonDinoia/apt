@@ -33,6 +33,18 @@ Modes and exit codes (S8's workflows map onto this contract):
       row verifies (pending entries are printed and tolerated), 1 on
       any drift or unverifiable asset, 2 with --complete when a pending
       remainder exists (1 still beats 2).
+  reanalyze-legacy [--include-stale]
+      Read-only backfill: for each legacy row with analysis:null
+      (--include-stale additionally: rows whose analysis predates the
+      current analysis fields bin_links, target_bin, root.dot_prefix),
+      its sha256 against the recorded digest (mismatch exits 1 naming
+      the row), run the same analysis pipeline as first sync, and write
+      the analysis with "analysis_source": "release". The legacy flag
+      stays set: provenance is that these rows were adopted from
+      release metadata, and now proved against the release bytes. Makes
+      no mutating GitHub calls, so no pacing applies. With
+      MIRROR_PAYLOAD_DIR set, a payload already on disk there replaces
+      the download after the same digest gate (test/iteration hook).
   selftest
       Offline. Synthetic fixtures plus the committed catalog.json; no
       network, no release access. Positive controls: every mutated
@@ -81,23 +93,33 @@ the asset. The only exceptions are the two mirror.sh-era nightlies
 gcc-17-trunk20260903.tar.xz and gcc-17-trunk20260904.tar.xz: they are
 ADOPTED with "legacy": true from release metadata only (name, size,
 GitHub-reported sha256; size cross-checked against the catalog's
-recorded bucket bytes), never re-downloaded, analysis: null. Only
-those two names auto-adopt.
+recorded bucket bytes), analysis: null until `reanalyze-legacy` proves
+them against the digest-verified release bytes. Only those two names
+auto-adopt.
 
 Analysis runs at first sync, stream-only: the tarball is decompressed
 in one pass with per-member reads via tarfile; peak disk = the one
 downloaded tarball. The `analysis` field of each row records: root
 layout (strip count, top dir, whether two-level <top>/<triplet>/
-nesting applies), bin/ inventory (basenames), host ELF e_machine of a
-bin/ member (stdlib struct parse; CE hosts are all x86-64), the union
-of DT_NEEDED sonames across bin/ executables (ELF section-header walk,
-no external deps; the machine has no pyelftools), has_binutils
-(ld/as/ar in bin/), multilib dirs (lib32/lib64/libx32 under root), the
-libgo soname if present, the gcc/clang version probed from lib paths
+nesting applies), bin/ inventory (basenames of FILE members), bin/ LINK
+inventory `bin_links` (basename -> {type: hardlink|symlink, target:
+normalized target basename}; GNU tar stores the second occurrence of an
+inode as a hardlink, so bin/gcc, bin/g++ and the binutils links hide
+here — S3's link rules need the union of bin and bin_links keys, which
+has_binutils/binutils_in_bin already count: a driver does not care how
+a bin/ entry materialized), host ELF e_machine of a bin/ member (stdlib
+struct parse; CE hosts are all x86-64), the union of DT_NEEDED sonames
+across bin/ executables (ELF section-header walk, no external deps; the
+machine has no pyelftools), has_binutils (ld/as/ar in the bin/
+universe), multilib dirs (lib32/lib64/libx32 under root), the libgo
+soname if present, the gcc/clang version probed from lib paths
 (required for catalog version_source:"payload" keys: the at12/at13
 families), and the target-side e_machine read from the payload's own
 crt/libc bytes (k1's EM_KVARC assumption resolved to 4919/0x1337 and
-vax to 75, both from payload bytes).
+vax to 75, both from payload bytes). `bin_links` is absent on rows
+analyzed before the field existed; reanalyze-legacy --include-stale
+backfills them from digest-verified release bytes and asserts the old
+fields reproduce exactly.
 
 mirror-manifest.json schema (canonical JSON: indent=2, sort_keys,
 trailing newline; this file is the sole writer; byte-stable when
@@ -372,21 +394,35 @@ BINUTILS = ("ar", "as", "ld")
 def analyze_tarball(path: Path) -> dict:
     """One decompression pass; per-member reads. Peak disk = the tarball."""
     names: dict[str, dict] = {}
+    links: dict[str, dict] = {}
     host_elf: dict | None = None
     needed: set[str] = set()
     target_emachine: int | None = None
+    dot_prefix = False
     with tarfile.open(path, "r|*") as tar:
         for m in tar:
             name = m.name
+            if name.startswith("./"):
+                dot_prefix = True
             while name.startswith("./"):
                 name = name[2:]
             if not name:
                 continue
+            if m.issym() or m.islnk():
+                # Link members carry no bytes, but they are half of the
+                # bin/ namespace a user sees: GNU tar stores the second
+                # occurrence of an inode as a hardlink, so bin/gcc, bin/g++
+                # and the binutils aliases only ever appear here.
+                links[name] = {"type": "symlink" if m.issym() else "hardlink",
+                               "target": (m.linkname or "").removeprefix("./")
+                                       .rstrip("/").rsplit("/", 1)[-1]}
+                names.setdefault(name, {"file": False})
+                continue
             if not m.isfile():
-                # Real tarballs carry DIRECTORY members, and symlinks or
-                # hardlinks besides. They restate prefixes the file paths
-                # already give; only FILE entries drive the root walk, the
-                # bin/ inventory and the ELF reads.
+                # Real tarballs carry DIRECTORY members besides. They restate
+                # prefixes the file paths already give; only FILE entries
+                # drive the root walk, the bin/ file inventory and the ELF
+                # reads.
                 names.setdefault(name, {"file": False})
                 continue
             names[name] = {"file": True, "exec": bool(m.mode & 0o111)}
@@ -419,6 +455,22 @@ def analyze_tarball(path: Path) -> dict:
                 break
     bins = sorted({p[-1] for n, p in parts.items()
                    if len(p) == strip + 2 and p[strip] == "bin" and names[n]["file"]})
+    bin_links = {p[-1]: links[n] for n, p in parts.items()
+                 if len(p) == strip + 2 and p[strip] == "bin" and n in links}
+    # A gcc-style payload also bundles its target binutils one level deeper:
+    # <prefix>/<target>/bin/{as,ld,...}, on the driver's own search path. crosstool
+    # cross payloads are the extreme case: bin/ holds only triplet-prefixed
+    # drivers and every real binutils entry lives down here.
+    target_bin = sorted({p[-1] for n, p in parts.items()
+                         if len(p) == strip + 3 and p[strip + 1] == "bin"
+                         and (names[n]["file"] or n in links)})
+    # The bin/ universe a user sees = file entries + link entries. binutils
+    # presence is judged over the universe and the target bin: a hardlinked ld
+    # assembles as well as a stored one.
+    universe = set(bins) | set(bin_links)
+    has_binutils = all(b in universe for b in BINUTILS) or (
+        {"ar", "as"} <= set(target_bin)
+        and bool({"ld", "ld.bfd"} & set(target_bin)))
     multilib = sorted({p[strip] for n, p in parts.items()
                        if len(p) > strip + 1 and p[strip] in MULTILIB_DIRS})
     libgo = sorted({p[-1] for p in parts.values()
@@ -433,17 +485,23 @@ def analyze_tarball(path: Path) -> dict:
                          "refusing to guess the payload")
     return {
         "bin": bins,
-        "binutils_in_bin": [b for b in BINUTILS if b in bins],
+        "bin_links": bin_links,
+        "binutils_in_bin": [b for b in BINUTILS if b in universe],
+        "target_bin": target_bin,
         "clang_version": clang_vers[0] if clang_vers else None,
         "gcc_targets": sorted({t for _v, t in gcc_vers}),
         "gcc_version": gcc_versions[0] if gcc_versions else None,
-        "has_binutils": all(b in bins for b in BINUTILS),
+        "has_binutils": has_binutils,
         "host_arch": EM_NAMES.get(host_elf["emachine"], "unknown") if host_elf else None,
         "host_emachine": host_elf["emachine"] if host_elf else None,
         "libgo_soname": libgo[-1] if libgo else None,
         "multilib": multilib,
         "needed": sorted(needed),
-        "root": {"nested": (seqs[0][1] if seqs and strip >= 2 else None),
+        # dot_prefix: raw member names carry a leading ./ (GNU tar style).
+        # strip counts NORMALIZED names, so a tar --strip-components=N for the
+        # raw members needs strip + dot_prefix.
+        "root": {"dot_prefix": dot_prefix,
+                 "nested": (seqs[0][1] if seqs and strip >= 2 else None),
                  "strip": strip,
                  "top": (seqs[0][0] if seqs and strip >= 1 else "")},
         "target_arch": (EM_NAMES.get(target_emachine, "unknown")
@@ -480,6 +538,13 @@ def sha256_path(path: Path) -> str:
 
 def download(key: str, dest: Path) -> None:
     req = urllib.request.Request(BUCKET + key, headers=UA)
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r, open(dest, "wb") as f:
+        while chunk := r.read(4 << 20):
+            f.write(chunk)
+
+
+def download_url(url: str, dest: Path) -> None:
+    req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r, open(dest, "wb") as f:
         while chunk := r.read(4 << 20):
             f.write(chunk)
@@ -988,6 +1053,92 @@ def cmd_check(complete: bool) -> int:
     return rc
 
 
+# ------------------------------------------------------ reanalyze-legacy
+#
+# The legacy rows entered the manifest from release metadata only; their
+# analysis is null, which gates every S3 consumer. The release bytes are
+# vouched for by the recorded digest (they equalled CE bytes at adopt/reconcile
+# time and GitHub hosts them since), so analysis is run against those bytes
+# instead of spending CE egress. Digest mismatch = the release holds unvouched
+# bytes: exit 1 naming the row, never analyze-and-proceed. Refreshing an
+# already analyzed row (--include-stale, for a row predating the current
+# analysis fields) must reproduce every recorded field; anything else is
+# pipeline drift and is named.
+
+def reanalyze_row(row: dict, payload: Path) -> None:
+    """Digest-gated analysis of a row's recorded release bytes."""
+    sha = sha256_path(payload)
+    if sha != row["sha256"]:
+        raise SystemExit(
+            f"FAIL  {row['asset']}: payload hashes sha256:{sha}, recorded "
+            f"{row['sha256']} — refusing to analyze unvouched bytes")
+    analysis = analyze_tarball(payload)
+    old = row.get("analysis")
+    if old is not None:
+        # Fields introduced after the row was recorded are expected, not
+        # drift: compare the old dict's coverage only, and let the new fields
+        # (bin_links, target_bin, root.dot_prefix) land freely.
+        drift_keys = (set(old) | set(analysis)) - {"bin_links", "target_bin"}
+        diff = {k for k in drift_keys if old.get(k) != analysis.get(k)}
+        # root gains dot_prefix after the fact; older rows never recorded it.
+        if diff == {"root"}:
+            base = {k: v for k, v in analysis["root"].items() if k != "dot_prefix"}
+            if all(old["root"].get(k) == v for k, v in base.items()):
+                diff = set()
+        # has_binutils/binutils_in_bin widen to the link-aware universe;
+        # every other difference means the pipeline changed its answers.
+        semantic = diff & {"has_binutils", "binutils_in_bin"}
+        drift = diff - semantic
+        if drift:
+            raise SystemExit(
+                f"FAIL  {row['asset']}: reanalysis changed {sorted(drift)}; the "
+                "analysis pipeline drifted from what recorded the row")
+        if semantic:
+            print(f"  {row['asset']}: {sorted(semantic)} widen to the "
+                  "link-aware bin/ universe (binutils ship as links there)")
+    row["analysis"] = analysis
+    row["analysis_source"] = "release"
+
+
+def cmd_reanalyze_legacy(include_stale: bool) -> int:
+    manifest = load_manifest()
+    rows = manifest["rows"]
+    stale = [b for b, r in sorted(rows.items())
+             if r.get("analysis") is None
+             or (include_stale
+                 and ("bin_links" not in r["analysis"]
+                      or "target_bin" not in r["analysis"]
+                      or "dot_prefix" not in r["analysis"].get("root", {})))]
+    if not stale:
+        print("reanalyze-legacy: every row already carries current analysis")
+        return 0
+    payload_dir = os.environ.get("MIRROR_PAYLOAD_DIR")
+    for b in stale:
+        row = rows[b]
+        asset = row["asset"]
+        url = (f"https://github.com/{REPO}/releases/download/{RELEASE}/"
+               f"{urllib.parse.quote(asset)}")
+        td = tempfile.TemporaryDirectory(prefix="mirror-reanalyze-")
+        try:
+            cached = Path(payload_dir) / asset if payload_dir else None
+            if cached is not None and cached.exists() \
+                    and sha256_path(cached) == row["sha256"]:
+                dest = cached
+            else:
+                dest = Path(td.name) / asset
+                print(f"  fetching {url}")
+                download_url(url, dest)
+            reanalyze_row(row, dest)
+            save_manifest(manifest)
+            print(f"  analyzed {row['asset']} from release bytes "
+                  f"({row['size'] >> 20} MiB, analysis_source=release)")
+        finally:
+            td.cleanup()
+    print(f"reanalyze-legacy: {len(stale)} rows now carry release-proven "
+          "analysis")
+    return 0
+
+
 # -------------------------------------------------------------- selftest
 
 def _mk_elf(emachine: int = 62, needed: tuple[str, ...] = ("libc.so.6",),
@@ -1217,8 +1368,8 @@ def cmd_selftest() -> int:
     try:
         a = analyze_tarball(fx)
         expect("analysis nested cross root",
-               a["root"] == {"nested": "k1-unknown-elf", "strip": 2,
-                             "top": "gcc-7.5.0"}, str(a["root"]))
+               a["root"] == {"dot_prefix": False, "nested": "k1-unknown-elf",
+                             "strip": 2, "top": "gcc-7.5.0"}, str(a["root"]))
         expect("analysis bin over nested root",
                a["bin"] == ["ar", "as", "g++", "gcc", "ld"], str(a["bin"]))
         expect("analysis binutils", a["has_binutils"] and
@@ -1259,8 +1410,8 @@ def cmd_selftest() -> int:
     try:
         a = analyze_tarball(fx)
         expect("plain root (gz, ./-prefixed member)",
-               a["root"] == {"nested": None, "strip": 1, "top": "gcc-16.2.0"},
-               str(a["root"]))
+               a["root"] == {"dot_prefix": True, "nested": None, "strip": 1,
+                             "top": "gcc-16.2.0"}, str(a["root"]))
         expect("plain root bin", a["bin"] == ["g++", "gcc"], str(a["bin"]))
         expect("plain root multilib", a["multilib"] == ["lib64"])
         expect("plain root version", a["gcc_version"] == "16.2.0")
@@ -1288,6 +1439,92 @@ def cmd_selftest() -> int:
            check_version_source(entry_at, {"gcc_version": None}) is not None and
            check_version_source(entry_at, {"gcc_version": "13.3.0"}) is None and
            check_version_source(entry_name, {"gcc_version": None}) is None)
+
+    # ---------------- link-aware bin/ inventory (S3 link rules read it)
+    # A payload whose bin/ entries are hardlinks/symlinks must surface in
+    # bin_links and count toward the binutils universe.
+    tmp = Path(tempfile.mkdtemp(prefix="mirror-selftest-"))
+    p = tmp / "linked.tar.xz"
+    with tarfile.open(p, "w:xz") as tar:
+        def _d(name):
+            ti = tarfile.TarInfo(name)
+            ti.type = tarfile.DIRTYPE
+            tar.addfile(ti)
+
+        def _f(name, data=b"", mode=0o755):
+            ti = tarfile.TarInfo(name)
+            ti.size = len(data)
+            ti.mode = mode
+            tar.addfile(ti, io.BytesIO(data))
+
+        def _l(name, target, sym=False):
+            ti = tarfile.TarInfo(name)
+            ti.type = tarfile.SYMTYPE if sym else tarfile.LNKTYPE
+            ti.linkname = target
+            ti.mode = 0o777 if sym else 0o755
+            tar.addfile(ti)
+        _d("t/")
+        _d("t/bin/")
+        _f("t/bin/as", gcc_bin, 0o755)
+        _f("t/bin/ar", gcc_bin, 0o755)
+        _l("t/bin/ld", "t/bin/as")                    # hardlink, like real CE bins
+        _l("t/bin/gcc", "t/bin/as")                   # a driver carried as a link
+        _l("t/bin/gp-x", "gprofng-archive", sym=True)  # relative symlink
+        _d("t/lib/")
+        _d("t/lib/gcc/")
+        _d("t/lib/gcc/t/")
+        _d("t/lib/gcc/t/1.2.3/")
+        _f("t/lib/gcc/t/1.2.3/crtbegin.o", _mk_elf(62, (), enc=1), 0o644)
+        _d("t/tgt/")
+        _d("t/tgt/bin/")
+        _f("t/tgt/bin/as", gcc_bin, 0o644)   # target-subdir binutils member
+    try:
+        a = analyze_tarball(p)
+        expect("bin_links records hard+sym links, files stay files",
+               a["bin"] == ["ar", "as"]
+               and a["bin_links"] == {
+                   "gcc": {"target": "as", "type": "hardlink"},
+                   "gp-x": {"target": "gprofng-archive", "type": "symlink"},
+                   "ld": {"target": "as", "type": "hardlink"}},
+               str({k: a[k] for k in ("bin", "bin_links")}))
+        expect("has_binutils counts the link universe",
+               a["has_binutils"] and a["binutils_in_bin"] == ["ar", "as", "ld"],
+               str(a["binutils_in_bin"]))
+        expect("target_bin records the target-subdir bin",
+               a["target_bin"] == ["as"], str(a["target_bin"]))
+
+        # ---------------- reanalyze-legacy row gate: digest mismatch refuses,
+        # release-proven bytes are recorded, pipeline drift is named
+        bad_row = {"asset": "linked.tar.xz", "sha256": "0" * 64, "analysis": None}
+        try:
+            reanalyze_row(bad_row, p)
+            expect("reanalyze refuses a wrong recorded digest", False)
+        except SystemExit as e:
+            expect("reanalyze refuses a wrong recorded digest",
+                   "linked.tar.xz" in str(e), str(e))
+        ok_row = {"asset": "linked.tar.xz", "sha256": sha256_path(p),
+                  "analysis": None}
+        reanalyze_row(ok_row, p)
+        expect("reanalyze records release-proven analysis",
+               ok_row["analysis"]["bin"] == ["ar", "as"]
+               and ok_row["analysis_source"] == "release")
+        # refresh of an old-schema row must pass and must catch pipeline drift
+        stale_row = {"asset": "linked.tar.xz", "sha256": sha256_path(p),
+                     "analysis": {k: v for k, v in ok_row["analysis"].items()
+                                  if k != "bin_links"}}
+        reanalyze_row(stale_row, p)
+        expect("schema-stale refresh reproduces recorded fields",
+               stale_row["analysis"]["bin_links"]["ld"]["target"] == "as")
+        drift_row = json.loads(json.dumps(stale_row))
+        drift_row["analysis"]["bin"] = ["as"]  # ar gone: a different past
+        try:
+            reanalyze_row(drift_row, p)
+            expect("pipeline drift in a refreshed row is caught", False)
+        except SystemExit as e:
+            expect("pipeline drift in a refreshed row is caught",
+                   "bin" in str(e), str(e))
+    finally:
+        _rm(p)
 
     # ---------------- manifest canonical form is byte-stable
     m = {"meta": manifest_meta(), "rows": {"a": {"b": [2, 3], "z": 1}}}
@@ -1345,6 +1582,8 @@ def main(argv: list[str]) -> int:
         return cmd_sync(max_downloads, selectors)
     if cmd == "check":
         return cmd_check("--complete" in rest)
+    if cmd == "reanalyze-legacy":
+        return cmd_reanalyze_legacy("--include-stale" in rest)
     if cmd == "selftest":
         return cmd_selftest()
     print(__doc__)
