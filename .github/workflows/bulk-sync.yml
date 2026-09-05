@@ -1,0 +1,96 @@
+name: bulk-sync
+
+# One-way backfill of the Compiler Explorer payload catalog onto the `mirror`
+# release (E23: runners sit closer to CE's S3 and the release host than the
+# dev box). ONE run mirrors ONE chunk -- deliberately no inner loop: the
+# pacing floor alone is >= 7.5 s x 2 x max between mutating GitHub calls,
+# --max 40 at ~200 MB avg is 8-10 GB of transfer (well under an hour), and
+# the 6 h job cap stays untouchable even so. Progression is the caller's
+# job: re-dispatch, or let the 03:17 UTC cron tick one chunk per day ahead
+# of the 04:17 nightly. Once every catalog payload is mirrored, sync does
+# housekeeping only and the cron degenerates to a no-op.
+#
+# Exit contract (mirror.py): sync 0 = chunk done, 1 = operational error
+# (fails the job). check --complete 0 = mirror complete, 2 = pending
+# remainder (expected mid-backfill: continue), 1 = drift on an immutable
+# stable (alarm: auto-heal is forbidden by design, a human must look).
+
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: "CE payloads mirrored this run (download cap)"
+        required: false
+        default: "40"
+  schedule:
+    # One chunk per day, ahead of the nightly at 04:17. Schedules fire on
+    # the default branch only, so this entry is inert on feature branches.
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write # release asset upload + manifest push
+
+# Serializes against nightly's mirror step by sharing its job-wide group;
+# cancel-in-progress false matches nightly so neither run preempts the
+# other mid-pacing.
+concurrency:
+  group: repo
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120 # estimate is well under an hour; a hang must not hold the shared lock for 6 h
+    steps:
+      - uses: actions/checkout@v5
+
+      # mirror.py is stdlib-only python (>= 3.11; runners ship newer) plus
+      # the preinstalled, GH_TOKEN-authenticated gh CLI; xz payloads stream
+      # through python's lzma module, so nothing gets apt-installed at all.
+      - name: Mirror one chunk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 mirror.py sync --max "${{ inputs.max || 40 }}"
+
+      # Commit the manifest BEFORE the check below: mirror-manifest.json is
+      # mirror.py's sole-writer domain, and landing the rows is what carries
+      # chunk progress to the next run -- that must hold even when the check
+      # later alarms on an unrelated row. Same bot identity, unchanged-guard
+      # and rebase/retry idiom as nightly's "Commit mirror manifest" step,
+      # parameterized onto this branch via the detached-safe HEAD:<branch>
+      # form. GITHUB_TOKEN pushes do not cascade-trigger push workflows.
+      - name: Commit mirror manifest
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mirror-manifest.json
+          if git diff --cached --quiet; then
+            echo "mirror-manifest.json unchanged; nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: mirror manifest after bulk-sync chunk"
+          pushed=false
+          for i in 1 2 3; do
+            if git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}"; then
+              pushed=true
+              break
+            fi
+            sleep 15
+          done
+          $pushed
+
+      # 0 = mirror complete (backfill done); 2 = pending remainder, the
+      # normal mid-backfill state -- re-dispatch for the next chunk; 1 =
+      # drift: fail loud for a human, never auto-heal.
+      - name: Verify mirror state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rc=0
+          python3 mirror.py check --complete || rc=$?
+          case $rc in
+            0) echo "mirror complete: every catalog payload is mirrored" ;;
+            2) echo "pending remainder: re-dispatch for the next chunk" ;;
+            *) echo "drift: mirror.py check exited $rc; needs a human" >&2; exit 1 ;;
+          esac
