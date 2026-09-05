@@ -43,11 +43,43 @@ jobs:
           echo "GPG_KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5; exit}')" >> "$GITHUB_ENV"
 
       # One download from the publisher per new version, ever; users and tests
-      # get the payload from the mirror release here.
-      - name: Mirror the gcc-trunk nightly
+      # get the payload from the mirror release here. mirror.py rotates new
+      # dated trunk nightlies into the release (keep-newest-two, catalog
+      # rename schemes), pacing its GitHub calls; --max 4 covers a normal
+      # day's rotations.
+      - name: Mirror the nightly payloads
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./mirror.sh
+        run: python3 mirror.py sync --max 4
+
+      # mirror.py rewrites mirror-manifest.json runner-locally (rotations,
+      # prunes) and the runner dies with it; committing it back is what
+      # carries the rows to the next run. This push authenticates as
+      # GITHUB_TOKEN, and GITHUB_TOKEN pushes do NOT cascade-trigger the
+      # push webhook, so this commit cannot re-fire the nightly — that
+      # property is load-bearing. mirror-manifest.json is mirror.py's
+      # sole-writer domain, so rebasing this manifest-only commit over a
+      # concurrent human push cannot conflict.
+      - name: Commit mirror manifest
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mirror-manifest.json
+          if git diff --cached --quiet; then
+            echo "mirror-manifest.json unchanged; nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: mirror manifest after nightly sync"
+          pushed=false
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+            sleep 15
+          done
+          $pushed
 
       - name: Build repository
         env:

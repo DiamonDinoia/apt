@@ -10,7 +10,9 @@
 #
 # The version comes from the publisher: a GitHub release tag with a leading "v"
 # stripped, a version_re applied to a JSON feed, or a version_re applied to the
-# path a plain URL redirects to.
+# path a plain URL redirects to. A fourth flavor fetches a small `text` page and
+# applies `text_re` to it; the regex's named groups drive the `url` and
+# `version` templates.
 
 [act]
 install = "member"
@@ -151,6 +153,31 @@ homepage = "https://luals.github.io"
 license = "MIT"
 section = "devel"
 
+# Intel's marketing page is bot-blocked, so the version oracle is the AUR
+# PKGBUILD, whose `_pkgver` carries kit::version-date. The URL template rebuilds
+# the CDN payload URL from the same groups; the payload answers HEAD and GET
+# with no cookie wall. The Debian version cannot keep upstream's `-2026-07-28`
+# suffix: dpkg splits upstream from revision at the last dash, which would read
+# revision "28". It becomes `10.13.1+20260728` — `+` stays inside upstream and
+# dates are unique per release, so ordering is preserved.
+[intel-sde]
+install = "tree"
+text = "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=intel-sde"
+text_re = '_pkgver:=(?P<kit>\d+)::(?P<num>[0-9.]+)-(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'
+url = "https://downloadmirror.intel.com/{kit}/sde-external-{num}-{y}-{m}-{d}-lin.tar.xz"
+version = "{num}+{y}{m}{d}"
+# The tree ships sde/sde64/xed/xed64 at its root, not under bin/. `sde` is the
+# 32-bit i386 driver (would need libc6:i386); on amd64 the usable entry point
+# is sde64, which AUR links the same way. xed stays internal: it has its own
+# Debian story in binutils.
+launcher = ["sde64"]
+links = { sde = "sde64" }
+description = "Intel Software Development Emulator"
+homepage = "https://www.intel.com/content/www/us/en/developer/articles/tool/software-development-emulator.html"
+license = "Proprietary, Intel Simplified Software License"
+section = "devel"
+depends = "libc6"
+
 # Juno's own drivers, forked and modified in DiamonDinoia/juno-drivers-debian,
 # whose CI builds and container-tests the package and attaches it to its
 # `builds` release. The payload is the package: the wrappers would drop the
@@ -187,62 +214,13 @@ version_re = '^juno-kde-fancontrol_([^_]+)_amd64\.deb$'
 description = "fan control and system monitor for Juno (Clevo) laptops"
 homepage = "https://github.com/DiamonDinoia/juno-kde-fancontrol"
 
-[gcc-17]
-install = "tree"
-repo = "DiamonDinoia/apt"
-tag = "mirror"
-# The major is pinned here on purpose. The day trunk becomes 18 no asset
-# matches and the build stops with the new name in the error, which is the
-# signal to add a [gcc-18] block and retire this one.
-asset = '^gcc-17-trunk[0-9]{8}\.tar\.xz$'
-version_re = 'gcc-(17)-(trunk[0-9]{8})\.tar\.xz'
-defer_to_debian = true
-# A compiler without the C library headers cannot compile anything, and
-# Debian's own gcc-NN depends on libc6-dev for the same reason. libxml2 is what
-# the nine libgcobol objects link against, so gcobol-17 cannot link without it;
-# Debian's libgcobol1 carries the same dependency.
-depends = "libc6, libc6-dev, libxml2"
-strip = 2
-launcher = ["bin/gcc"]
-section = "devel"
-homepage = "https://gcc.gnu.org"
-description = "GCC 17 pre-release, built nightly by Compiler Explorer, mirrored here"
-license = "GPL-3.0-or-later with GCC Runtime Library Exception"
-
-# Debian's own naming, so a script written for gcc-17 keeps working after the
-# distribution takes the name over. `go` and `gofmt` are deliberately absent:
-# they are Go programs linked against the payload's libgo, so they exit 127
-# outside a loader path this package does not set. The bundled binutils are
-# absent too, because the driver finds them itself and Debian's gcc-NN does not
-# put them in PATH either.
-[gcc-17.links]
-"g++-17" = "bin/g++"
-"cpp-17" = "bin/cpp"
-"gfortran-17" = "bin/gfortran"
-"gcc-ar-17" = "bin/gcc-ar"
-"gcc-nm-17" = "bin/gcc-nm"
-"gcc-ranlib-17" = "bin/gcc-ranlib"
-"gcov-17" = "bin/gcov"
-"gcov-dump-17" = "bin/gcov-dump"
-"gcov-tool-17" = "bin/gcov-tool"
-"lto-dump-17" = "bin/lto-dump"
-"gccgo-17" = "bin/gccgo"
-"gdc-17" = "bin/gdc"
-"gm2-17" = "bin/gm2"
-"gccrs-17" = "bin/gccrs"
-"ga68-17" = "bin/ga68"
-"gcobol-17" = "bin/gcobol"
-"gcobc-17" = "bin/gcobc"
-"gnat-17" = "bin/gnat"
-"gnatbind-17" = "bin/gnatbind"
-"gnatchop-17" = "bin/gnatchop"
-"gnatclean-17" = "bin/gnatclean"
-"gnatkr-17" = "bin/gnatkr"
-"gnatlink-17" = "bin/gnatlink"
-"gnatls-17" = "bin/gnatls"
-"gnatmake-17" = "bin/gnatmake"
-"gnatname-17" = "bin/gnatname"
-"gnatprep-17" = "bin/gnatprep"
+# Compiler payloads (gcc/clang stables and trunk families) are not listed
+# here: build.py derives one bundle per catalog.json entry from the recorded
+# Debian naming shapes and mirror-manifest.json's per-payload analysis. The
+# gcc-17 wrapper that used to live here became the catalog's gcc-trunk bundle;
+# the major is pinned by the rename scheme the mirror applies, and the day
+# trunk becomes 18 the bundle is named gcc-18 by the same catalog machinery
+# that stops the mirror (`no asset matches ...; have: gcc-18-trunk...`).
 
 # Third-party apt sources this repository sets up, so a fresh machine needs one
 # install rather than ten hand-written files. Each key is fetched at build time

@@ -15,13 +15,17 @@ boot=$(gh release view repo --repo "$repo" --json assets \
 [ -n "$boot" ] || { echo "FAIL  no bootstrap package in the repo release"; exit 1; }
 echo "bootstrap: $boot"
 
-# The links come from packages.toml, so the test cannot drift from the package:
-# a tool added there is a tool checked here. Names and targets are read
-# separately because the checks below need both and must not assume the one can
-# be derived from the other.
-IFS=$'\t' read -r links targets < <(python3 -c "import tomllib
-spec = tomllib.load(open('packages.toml', 'rb'))['gcc-17']['links']
-print(' '.join(spec) + chr(9) + ' '.join(t.split('/')[-1] for t in spec.values()))")
+# The links come from the merged spec the build serves (S3: dump-spec; S5 owns
+# this file's outcome), so the test cannot drift from the package: a tool the
+# bundle drops is a tool missed here. Names and targets are read separately
+# because the checks below need both and must not assume the one can be
+# derived from the other.
+IFS=$'\t' read -r links targets < <(python3 -c "
+import json, subprocess
+s = json.loads(subprocess.run(['python3', 'build.py', '--dump-spec'],
+               capture_output=True, text=True, check=True).stdout)
+links = s['bundles']['gcc-17']['links']
+print(' '.join(links) + chr(9) + ' '.join(t.split('/')[-1] for t in links.values()))")
 
 "$engine" run --rm -i debian:sid bash -s "$boot" "$links" "$targets" <<'INNER'
 set -euo pipefail
@@ -52,7 +56,10 @@ dpkg-deb -R /tmp/boot.deb /tmp/stale
 python3 - <<'STALE'
 import re, pathlib
 pin = pathlib.Path("/tmp/stale/etc/apt/preferences.d/diamondinoia")
-pin.write_text(re.sub(r"\nPackage: gcc-17\n[^\n]*\nPin-Priority: 100\n", "", pin.read_text()))
+# S3 note (S5 owns this file): the 100 stanza may be the compiler-namespace
+# glob form (Package: gcc-* clang-*) instead of an enumerated gcc-17 stanza;
+# the stale stand-in drops the whole 100 stanza either way.
+pin.write_text(re.sub(r"\nPackage: [^\n]*\nPin: release l=diamondinoia\nPin-Priority: 100\n", "", pin.read_text()))
 ctl = pathlib.Path("/tmp/stale/DEBIAN/control")
 ctl.write_text(re.sub(r"^Version: 1\.\d+", "Version: 1.0", ctl.read_text(), flags=re.M))
 STALE
@@ -76,8 +83,16 @@ apt-get -qq update
 # Under `pipefail` a `grep -q` that exits on the first match sends SIGPIPE to
 # the producer, and the pipeline then reports 141 even though the match was
 # found, which turns a pass into a failure.
+# (S3 touch, S5 owns the file: the 100 stanza may name a gcc-*/clang-* glob —
+# membership of gcc-17 is a glob match, not a stanza name.)
 pin=$(cat /etc/apt/preferences.d/diamondinoia)
-grep -A2 '^Package: gcc-17$' <<<"$pin" | grep 'Pin-Priority: 100' >/dev/null ||
+python3 - "$pin" <<'PIN' ||
+import fnmatch, re, sys
+m = re.search(r"Package: ([^\n]*)\nPin: release l=diamondinoia\nPin-Priority: 100",
+              sys.argv[1])
+sys.exit(0 if m and any(fnmatch.fnmatchcase("gcc-17", t) for t in m.group(1).split())
+         else 1)
+PIN
     fail "gcc-17 is not pinned at 100:$(printf '\n%s' "$pin")"
 ok "pinned at 100"
 apt-get -qq update
@@ -116,7 +131,7 @@ present=$(for b in /opt/gcc-17/bin/*; do n=${b##*/}
               [[ $n =~ $skip ]] || printf '%s\n' "$n"; done | sort)
 extra=$(comm -13 <(printf '%s\n' "$linked") <(printf '%s\n' "$present"))
 [ -z "$extra" ] || fail "the payload ships tools that are neither linked nor
-    excluded, so packages.toml is behind it:$(printf '\n  %s' $extra)"
+    excluded, so the build's link table is behind it:$(printf '\n  %s' $extra)"
 ok "all $(wc -l <<<"$present") tools in the payload are linked or excluded"
 
 # Control: a name the payload does not ship must come out of the same
@@ -327,9 +342,10 @@ echo "-- control: raise the pin to 600 and nothing else, ours must win again"
 cp /etc/apt/preferences.d/diamondinoia /tmp/pin.orig
 python3 - <<'PIN'
 import pathlib
+# S3 touch (S5 owns this file): raise whichever pragma holds the 100 to 600 —
+# there is exactly one "Pin-Priority: 100" line in the shipped pin.
 f = pathlib.Path("/etc/apt/preferences.d/diamondinoia")
-f.write_text(f.read_text().replace("Package: gcc-17\nPin: release l=diamondinoia\nPin-Priority: 100",
-                                   "Package: gcc-17\nPin: release l=diamondinoia\nPin-Priority: 600"))
+f.write_text(f.read_text().replace("Pin-Priority: 100", "Pin-Priority: 600"))
 PIN
 [ "$(grep -c 'Pin-Priority: 600' /etc/apt/preferences.d/diamondinoia)" = 2 ] ||
     fail "the pin rewrite did not take"
