@@ -25,6 +25,14 @@ name: bulk-sync
 # stable (alarm: auto-heal is forbidden by design, a human must look).
 
 on:
+  # TEMPORARY (S8a bootstrap, removed before merge): GitHub registers
+  # workflows from the default branch only, so a brand-new file cannot be
+  # dispatched on a feature branch; a branch-scoped push trigger needs no
+  # registration. The bot's manifest push inside the run cannot re-fire
+  # this (GITHUB_TOKEN pushes skip triggers). The settled design is
+  # workflow_dispatch + schedule only.
+  push:
+    branches: [team/8a-bulk-sync]
   workflow_dispatch:
     inputs:
       max:
