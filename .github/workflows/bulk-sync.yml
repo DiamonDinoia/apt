@@ -10,6 +10,15 @@ name: bulk-sync
 # of the 04:17 nightly. Once every catalog payload is mirrored, sync does
 # housekeeping only and the cron degenerates to a no-op.
 #
+# mirror.py sync never pulls a never-mirrored payload on its own, by design
+# (stables: explicit pull only; trunk families: first pull only when
+# selected -- a selector-less run re-downloads nothing, which is what keeps
+# the nightly byte-stable). The backfill chunk is therefore computed here
+# from catalog + manifest with mirror.py's own primitives and passed as
+# selectors: pending trunk families by bare family name (one rotation pull
+# each), pending stables family-interleaved newest-first via
+# mirror.round_robin, so any chunk is shape-representative.
+#
 # Exit contract (mirror.py): sync 0 = chunk done, 1 = operational error
 # (fails the job). check --complete 0 = mirror complete, 2 = pending
 # remainder (expected mid-backfill: continue), 1 = drift on an immutable
@@ -58,7 +67,32 @@ jobs:
       - name: Mirror one chunk
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 mirror.py sync --max "${{ inputs.max || 40 }}"
+          MAX: ${{ inputs.max || 40 }}
+        run: |
+          set -euo pipefail
+          mapfile -t sel < <(python3 - "$MAX" <<'PYEOF'
+          import json
+          import sys
+          import mirror
+
+          catalog = json.loads(mirror.CATALOG.read_text())
+          rows = mirror.load_manifest()["rows"]
+          sel = []
+          for fam in sorted(catalog["trunk_families"]):
+              latest = mirror.dated_prefix_listing(fam)
+              if latest and f"{fam}-{max(latest)}.tar.xz" not in rows:
+                  sel.append(fam)
+          stables = [e for e in catalog["packaged"] if e["asset"] not in rows]
+          sel += [e["asset"] for e in mirror.round_robin(stables)]
+          print("\n".join(sel[: int(sys.argv[1])]))
+          PYEOF
+          )
+          if ((${#sel[@]} == 0)); then
+            echo "nothing pending; the mirror is complete"
+            exit 0
+          fi
+          echo "chunk: ${#sel[@]} selectors (cap $MAX): ${sel[*]}"
+          python3 mirror.py sync --max "$MAX" "${sel[@]}"
 
       # Commit the manifest BEFORE the check below: mirror-manifest.json is
       # mirror.py's sole-writer domain, and landing the rows is what carries
