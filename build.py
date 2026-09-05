@@ -344,7 +344,6 @@ fi
 rm -rf {prefix}
 mv "$staging" {prefix}
 trap 'rm -rf "$tmp"' EXIT
-ln -sfn "{prefix}/$launcher" /usr/bin/{name}
 {links}""",
 }
 
@@ -361,7 +360,14 @@ rm -f /usr/bin/{bin}
 """,
     "tree": """#!/bin/sh
 set -e
-rm -rf {prefix} /usr/bin/{name} {link_names}
+# Remove only links that point into our own prefix: on a same-named distro
+# upgrade the incoming package's files can land before our prerm runs, and an
+# unconditional rm would delete the distribution's tracked file.
+for p in /usr/bin/{name} {link_names}; do
+    [ -L "$p" ] || continue
+    case $(readlink "$p") in {prefix}/*) rm -f "$p";; esac
+done
+rm -rf {prefix}
 """,
 }
 
@@ -449,9 +455,26 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
         "link_checks": "".join(
             f'[ -x "$staging"/{target} ] || {{ echo "missing: {target}" >&2; exit 1; }}\n'
             for target in links.values()),
-        "links": "".join(
-            f'ln -sfn {prefix}/{target} /usr/bin/{link}\n'
-            for link, target in links.items()),
+        # Links are created only over paths that are absent or already point
+        # into our own prefix: a path the distribution owns (a real file from
+        # a distro package, or its symlink) is left alone, because the defer
+        # regime means its owner wins any co-installation ordering. Without
+        # the guard, ln -sfn clobbers a distro split's tracked path when our
+        # postinst happens to run between the split's unpack and ours.
+        "links": (f'for pair in "/usr/bin/{{name}}|{prefix}/$launcher"'
+                  + "".join(f' "/usr/bin/{link}|{prefix}/{target}"'
+                            for link, target in links.items())
+                  + '\n'
+                  'do\n'
+                  '    p=${pair%%|*}; t=${pair#*|}\n'
+                  '    if [ -L "$p" ]; then\n'
+                  f'        case $(readlink "$p") in {prefix}/*) rm -f "$p";; *) continue;; esac\n'
+                  '    elif [ -e "$p" ]; then\n'
+                  '        echo "kept distribution-owned path $p" >&2\n'
+                  '        continue\n'
+                  '    fi\n'
+                  '    ln -sfn "$t" "$p"\n'
+                  'done\n'),
         "link_names": " ".join(f"/usr/bin/{link}" for link in links),
     }
     for script, table in (("postinst", POSTINST), ("prerm", PRERM)):
