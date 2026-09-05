@@ -1,5 +1,39 @@
 {
-  "cutoff": {},
+  "cutoff": {
+    "clang_cutoff": {
+      "measured": "2026-09-05",
+      "policy": "clang series \u22643.9 \u2192 L1",
+      "result": "3.3: plain C link fails ('cannot find crtbegin.o': the driver predates multiversion GCC discovery; --gcc-toolchain is unrecognized); C with -B/-L /usr/lib/gcc/x86_64-linux-gnu/16 compiles and runs (s4-c-5050); C++ fails on libstdc++-16-dev headers (/usr/include/c++/16/bits/stl_function.h:442:10: error: use of undeclared identifier '__UINTPTR_TYPE__')"
+    },
+    "ldd": {
+      "clang-24": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.10.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-05",
+        "reason": "clang-trunk payload runtime libs that no Depends can resolve, measured by S4's sweep on debian:sid after install with the bundle's declared Depends: the payload's libc++/libc++abi are linked against libunwind.so.1 with no rpath (upstream LLVM builds them so, and libc++.so.1.0 also NEEDs libatomic.so.1 from the gcc runtime tree, which the bundle's Depends (rightly: the compiler itself never runs it) do not carry; a user links these only by opting into the payload's own C++ runtime), and share/gdb/python/ompd/ompdModule.so NEEDs libpython3.10.so.1.0, a soname no sid/trixie package ships. Asserted both directions: a surprise not-found fails the matrix as hard as one of these unexpectedly resolving."
+      }
+    }
+  },
   "relr": {
     "10/sid": {
       "baseline": "sid",

@@ -1,0 +1,145 @@
+name: validate-compilers
+
+# S4's CI-only validation entry (E23: the runner network beats the dev box for
+# the multi-hundred-MB mirrored payloads). Dispatched by hand against a team
+# branch; test_compilers.sh is the same file the per-push/shard and scheduled
+# sweep wiring will reuse (S8b reconciles the final workflow set).
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "shard denominator N; the plan job dispatches only the slots over the sorted catalog entry keys that resolve >= 1 mirrored bundle (empty slots are not scheduled — the suite fails them by design)"
+        default: "4"
+        required: true
+      baselines:
+        description: "comma-separated subset of sid,trixie"
+        default: "sid,trixie"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      empty: ${{ steps.plan.outputs.empty }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+      # The matrix is derived from the shard space itself: sorted catalog
+      # entry keys, round-robin; a slot is dispatched iff it resolves at
+      # least one emit bundle (test_compilers.sh exits 1 on an empty slot,
+      # so scheduling one would be a guaranteed red cell, and scheduling
+      # none of them would silently test nothing).
+      - id: plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHARD_N: ${{ inputs.shards }}
+          BASELINES: ${{ inputs.baselines }}
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import json
+          import os
+          import subprocess
+          import sys
+
+          n = int(os.environ["SHARD_N"])
+          baselines = [b.strip() for b in os.environ["BASELINES"].split(",")
+                       if b.strip()]
+          for b in baselines:
+              assert b in ("sid", "trixie"), f"bad baseline {b!r}"
+          assert n >= 1, "shard denominator < 1"
+
+          catalog = json.load(open("catalog.json"))
+          spec = json.loads(subprocess.run(
+              [sys.executable, "build.py", "--dump-spec"],
+              capture_output=True, text=True, check=True).stdout)
+          emit = [k for k, b in spec["bundles"].items()
+                  if b.get("state") == "emit"]
+          assert emit, "no mirrored bundles at all — nothing to validate"
+          fam = {b["family"]: k for k, b in spec["bundles"].items()
+                 if b.get("state") == "emit"}
+
+          names = sorted([e["name"] for e in catalog["packaged"]]
+                         + list(catalog["trunk_families"]))
+          slots, empty = [], []
+          for i in range(1, n + 1):
+              slot = [x for j, x in enumerate(names) if j % n == i - 1]
+              if any(x in emit or x in fam for x in slot):
+                  slots.append(i)
+              else:
+                  empty.append(i)
+          matrix = {"include": [{"baseline": b, "shard": f"{i}/{n}"}
+                                for b in baselines for i in slots]}
+          print(f"slots dispatched: {slots}; empty slots skipped: {empty}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("matrix=" + json.dumps(matrix) + "\n")
+              f.write("empty=%s\n" % (f"{empty[0]}/{n}" if empty else ""))
+          EOF
+      - name: Plan summary
+        run: |
+          echo '### validate-compilers plan' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ steps.plan.outputs.matrix }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  matrix:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+      # The suite generates a throwaway signing key itself when GPG_KEY_ID is
+      # unset — this branch workflow deliberately does not need
+      # secrets.GPG_PRIVATE_KEY. Its containers fetch every payload from the
+      # REAL mirror release URL in their postinst (production path), once per
+      # asset per job.
+      - name: Pull base images
+        run: |
+          set -euo pipefail
+          engine=$(command -v podman || command -v docker)
+          $engine pull "debian:${{ matrix.baseline }}"
+          $engine pull debian:sid  # the install-UX legs' container
+      - name: Free runner disk
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+      - name: Run the shard
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./test_compilers.sh --shard "${{ matrix.shard }}" --baseline "${{ matrix.baseline }}"
+
+  # The non-vacuity rule, proven against the live shard space: a slot that
+  # resolves zero mirrored bundles must exit 1 with nothing tested.
+  empty-shard-control:
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+      - name: An empty shard fails
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EMPTY: ${{ needs.plan.outputs.empty }}
+        run: |
+          set -uo pipefail
+          if [ -z "$EMPTY" ]; then
+            echo "no empty slot exists at this N; control vacuous today"
+            exit 0
+          fi
+          if ./test_compilers.sh --shard "$EMPTY" > control.log 2>&1; then
+            echo "FAIL: empty shard $EMPTY exited 0"
+            exit 1
+          fi
+          grep -q "resolved ZERO packages" control.log ||
+            { echo "FAIL: shard $EMPTY failed WITHOUT the zero-package verdict"
+              cat control.log; exit 1; }
+          echo "ok: empty shard $EMPTY refused ($(grep -c . control.log) log lines, 0 containers)"
