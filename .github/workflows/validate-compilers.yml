@@ -3,7 +3,10 @@ name: validate-compilers
 # S4's CI-only validation entry (E23: the runner network beats the dev box for
 # the multi-hundred-MB mirrored payloads). Dispatched by hand against a team
 # branch; test_compilers.sh is the same file the per-push/shard and scheduled
-# sweep wiring will reuse (S8b reconciles the final workflow set).
+# sweep wiring will reuse (S8b reconciles the final workflow set — until this
+# file lands on the default branch, `gh workflow run` 404s on it; on this
+# branch it was validated via a temporary push trigger, removed after the
+# green run).
 on:
   workflow_dispatch:
     inputs:
@@ -15,10 +18,6 @@ on:
         description: "comma-separated subset of sid,trixie"
         default: "sid,trixie"
         required: true
-  # CI-probing while this file lives only on the team branch (dispatch
-  # requires the workflow on the default branch); removed once validated.
-  push:
-    branches: [team/4-compiler-matrix]
 
 permissions:
   contents: read
@@ -41,6 +40,8 @@ jobs:
       - id: plan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The || fallbacks make the file safe under the non-dispatch
+          # triggers S8b adds later (push/schedule carry no inputs).
           SHARD_N: ${{ inputs.shards || '4' }}
           BASELINES: ${{ inputs.baselines || 'sid,trixie' }}
         run: |
