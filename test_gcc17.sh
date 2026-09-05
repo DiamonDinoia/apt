@@ -1,9 +1,13 @@
 #!/bin/bash
 # End-to-end check of the gcc-17 package in a clean container: it installs from
-# the published repository, the compiler it installs actually compiles, and the
-# pin hands the name over to the distribution the moment the distribution
-# publishes it. The handover is the part CI cannot check, because it needs a
-# second repository standing in for Debian's archive.
+# the published repository and the compiler it installs actually compiles.
+# The distro-precedence behaviour this file used to verify here against a
+# stand-in repository (handover on upgrade, pin-flip-to-600 control) moved to
+# test_precedence.sh, which runs it against a locally built repository over
+# three fixtures with exact remove/keep assertions. What remains unique here
+# is the PUBLISHED path: the released bootstrap deb and its byte-pinned
+# upgrade path, and the payload's compile battery — neither reproducible
+# offline.
 set -euo pipefail
 
 engine=$(command -v podman || command -v docker) || {
@@ -304,59 +308,6 @@ echo 'int main(){ return undefined_symbol_xyz(); }' > /tmp/bad.c
 gcc-17 -Werror=implicit-function-declaration -o /tmp/bad /tmp/bad.c 2>/dev/null &&
     fail "the compiler accepted an undeclared function; earlier successes prove nothing"
 ok "an invalid program is rejected, so the successes above are real"
-
-echo
-echo "== handover: a second repository stands in for Debian shipping gcc-17"
-mkdir -p /srv/deb/pkg/DEBIAN
-stub() {
-    printf 'Package: gcc-17\nVersion: %s\nArchitecture: amd64\nMaintainer: d <d@invalid>\nDescription: stand-in for the distribution package\n' "$1" \
-        > /srv/deb/pkg/DEBIAN/control
-    rm -f /srv/deb/*.deb
-    dpkg-deb --root-owner-group --build /srv/deb/pkg "/srv/deb/gcc-17_$1_amd64.deb" >/dev/null
-    # A compressed index too, or apt logs six warnings per update for the
-    # variants it cannot find, which buries the evidence this check produces.
-    ( cd /srv/deb && dpkg-scanpackages --multiversion . /dev/null > Packages 2>/dev/null
-      gzip -kf Packages )
-    echo 'deb [trusted=yes] file:///srv/deb ./' > /etc/apt/sources.list.d/stand-in.list
-    apt-get -qq update
-}
-
-mine=$(dpkg-query -W -f '${Version}' gcc-17)
-
-echo "-- the distribution publishes a higher version"
-stub 17.1.0-1
-apt-cache policy gcc-17
-[ "$(apt-cache policy gcc-17 | sed -n 's/^ *Candidate: //p')" = 17.1.0-1 ] ||
-    fail "the distribution package did not become the candidate"
-for cmd in upgrade dist-upgrade; do
-  grep '^Inst gcc-17 .*17\.1\.0-1' <<<"$(apt-get -s $cmd)" >/dev/null ||
-    fail "apt-get $cmd does not hand gcc-17 over"
-done
-ok "apt upgrade and dist-upgrade both replace $mine with 17.1.0-1"
-
-echo "-- control: raise the pin to 600 and nothing else, ours must win again"
-# Same two repositories, same two versions. Only the pin differs, so the pin is
-# what causes the handover and the check above is not passing for some other
-# reason. apt does not downgrade across priorities, which is why the version
-# also has to sort below the distribution's; the pin alone is not enough.
-cp /etc/apt/preferences.d/diamondinoia /tmp/pin.orig
-python3 - <<'PIN'
-import pathlib
-# S3 touch (S5 owns this file): raise whichever pragma holds the 100 to 600 —
-# there is exactly one "Pin-Priority: 100" line in the shipped pin.
-f = pathlib.Path("/etc/apt/preferences.d/diamondinoia")
-f.write_text(f.read_text().replace("Pin-Priority: 100", "Pin-Priority: 600"))
-PIN
-[ "$(grep -c 'Pin-Priority: 600' /etc/apt/preferences.d/diamondinoia)" = 2 ] ||
-    fail "the pin rewrite did not take"
-
-apt-get -qq update
-[ "$(apt-cache policy gcc-17 | sed -n 's/^ *Candidate: //p')" = "$mine" ] ||
-    fail "at 600 the nightly is still not the candidate; the pin is not the cause"
-grep '^Inst gcc-17' <<<"$(apt-get -s upgrade)" >/dev/null &&
-    fail "at 600 an upgrade to the stand-in is still offered"
-ok "at 600 the candidate is $mine and no handover happens"
-cp /tmp/pin.orig /etc/apt/preferences.d/diamondinoia
 
 echo
 echo "ALLPASS"
