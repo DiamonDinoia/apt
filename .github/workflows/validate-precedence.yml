@@ -12,6 +12,11 @@ on:
       legs:
         description: "suite legs to run (a,b,cfwd,crev)"
         default: "a,b,cfwd,crev"
+  # Branch-only bootstrap: workflow_dispatch registration needs the file on
+  # the default branch, so the first green runs on this push trigger. The
+  # trigger is dropped once the run is recorded, leaving dispatch-only.
+  push:
+    branches: [team/5-precedence]
 
 permissions:
   contents: read
