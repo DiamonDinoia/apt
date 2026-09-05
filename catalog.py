@@ -19,10 +19,15 @@ catalog.json sections:
   schema         this schema, for standalone readers
   listing        every live key -> {bytes, modified}
   listing_keys   sorted(listing); what check diffs against
-  debian         per-suite inventory scraped from deb.debian.org: native
-                 compiler packages, versioned cross compilers, arch-spelled
-                 dev libs, and all gcc/clang/libgcc-named packages with the
-                 exact version strings Debian ships
+  debian         per-suite inventory scraped from deb.debian.org, in six
+                 buckets: compilers (per-series driver/frontend/tool splits),
+                 cross_compilers (per-series tool-N-<triplet>), cross and
+                 native dev libs, runtime_and_base_packages (the names
+                 build.py's denylist governs, recorded so the denylist is
+                 evidence-backed), and other_compiler_packages (the rest of
+                 the gcc/clang family stems) — all with the exact version
+                 strings Debian ships. The inventory is ground truth; what
+                 may be claimed from it is build.py's decision, not made here.
   packaged       list of entries:
     key            bucket key (opt/...)
     asset          payload basename
@@ -580,25 +585,119 @@ def ce_yaml_ref() -> str:
 
 
 # ---------------------------------------------------------- debian scrape
+#
+# Debian splits one compiler series across many packages. The inventory
+# records every gcc/clang-family name in six buckets, matched in listed
+# order with the stem catch-all last:
+#   compilers                  per-series driver/frontend/tool splits
+#                              (gcc-N, g++-N, cpp-N, gfortran-N, ..., clang-N,
+#                              clang-tools-N, clang-tidy-N, clang-format-N,
+#                              clangd-N, lld-N, lldb-N)
+#   cross_compilers            per-series tool-N-<triplet> cross compilers
+#   cross_dev_libs             arch-spelled cross dev libs
+#                              (libgcc-N-dev-arm64-cross class)
+#   native_dev_libs            per-series native dev libs
+#                              (libstdc++-N-dev, libclang-18-dev, libomp-N-dev)
+#   runtime_and_base_packages  runtime soname packages (libgcc-s1,
+#                              libstdc++6, libgnat-14, libc++1-18, ...) and
+#                              -base/-cross-base packages — recorded so
+#                              build.py's P/C/R denylist is evidence-backed
+#   other_compiler_packages    everything else under the family stems
+# The stems carry boundary anchors so look-alikes stay out: lldpad/lldpd are
+# LLDP daemons (not lld-N), cppcheck/cppman are not cpp-N, and libobjcryst,
+# libompl*, libomp-jonathonl and libclang-perl are not the compiler libs.
+
+_DEB_TRIPLET = r"[a-z0-9][a-z0-9+]*-linux-gnu[a-z0-9+]*"
+_DEB_FRONTENDS = (r"gcc|g\+\+|cpp|gfortran|gccgo|gdc|gm2|gcobol|gccrs|gnat|"
+                  r"gobjc|gobjc\+\+")
+_DEB_CLANG_TOOLS = r"clang(?:-tools|-tidy|-format)?|clangd|lld|lldb"
+
+_DEBIAN_RULES = (
+    ("compilers", re.compile(
+        rf"^(?:{_DEB_FRONTENDS}|{_DEB_CLANG_TOOLS})-\d+(?:\.\d+)?$")),
+    ("cross_compilers", re.compile(
+        rf"^(?:{_DEB_FRONTENDS})-\d+-{_DEB_TRIPLET}$")),
+    ("cross_dev_libs", re.compile(
+        r"^(?:libgcc|libstdc\+\+|libgfortran|libobjc)-\d+-dev-[a-z0-9]+-cross$")),
+    ("native_dev_libs", re.compile(
+        r"^(?:libgcc|libstdc\+\+|libgccjit)-\d+-dev$"
+        r"|^libclang(?:-common|-rt)?-\d+-dev$|^libclang-cpp\d+-dev$"
+        r"|^libc\+\+(?:abi)?-\d+-dev$"
+        r"|^libomp-\d+-dev$|^libunwind-\d+-dev$")),
+    ("runtime_and_base_packages", re.compile(
+        r"^(?:libgcc-s\d+|libstdc\+\+\d+|libgomp\d+|libatomic\d+|"
+        r"libgfortran\d+|libobjc\d+|libgnat-\d+)(?:-[a-z0-9]+-cross)?$"
+        r"|^libgccjit\d+$"
+        r"|^libc\+\+1?-\d+$|^libclang1-\d+$|^libclang-cpp\d+$"
+        r"|^libomp\d+-\d+$|^libunwind-\d+$"
+        r"|^gcc-\d+(?:\.\d+)?-base$"
+        r"|^gcc-\d+(?:\.\d+)?-cross-base(?:-[a-z]+)?$"
+        rf"|^gcc-\d+(?:\.\d+)?-{_DEB_TRIPLET}-base$")),
+)
+_DEBIAN_STEMS_RE = re.compile(
+    r"^(?:gcc|g\+\+|gobjc|gfortran|gdc(?:-|$)|gm2(?:-|$)|gnat(?:-|$)|"
+    r"cpp(?:-|$)|clang|lld(?:-\d|$)|lldb(?:-\d|$)|libgcc|libstdc\+\+|"
+    r"libgfortran|libobjc(?:\d|-)|libgomp|libatomic|libclang(?:\d|-(?!perl)|$)|"
+    r"libc\+\+|libomp(?:\d|-(?!jonathonl))|libunwind-\d)")
+
+# Probe names the generate guard requires in each suite's recorded inventory;
+# all verified live 2026-09-04 (fetch DEBIAN_INDEX, match "^Package: <name>$").
+# trixie is frozen: its default series (gcc 14, LLVM 19) cannot rot away. sid
+# pins the resident default series, gcc 15 (default since 2025-08), and
+# gcc-12 as the long tail — sid carries each series for years (gcc-11..16
+# are all resident today), so a probe fails only after a real series
+# removal, which is the event this guard exists for.
+DEBIAN_SERIES_PROBES = {
+    "sid": (
+        "gcc-15", "gcc-12", "g++-15", "cpp-15", "gfortran-15", "gccgo-15",
+        "gdc-15", "gm2-15", "gccrs-15", "gcobol-15", "gnat-15", "gobjc-15",
+        "gobjc++-15", "libgcc-15-dev", "libstdc++-15-dev", "libgccjit-15-dev",
+        "libgcc-15-dev-arm64-cross", "libstdc++-15-dev-arm64-cross",
+        "cpp-15-aarch64-linux-gnu", "gfortran-15-aarch64-linux-gnu",
+        "gcc-15-base", "gcc-15-cross-base", "gcc-15-aarch64-linux-gnu-base",
+        "clang-19", "clang-tools-19", "clang-tidy-19", "clang-format-19",
+        "lld-19", "libomp-19-dev", "libc++-19-dev", "libc++1-18",
+    ),
+    "trixie": (
+        "gcc-14", "gcc-12", "g++-14", "cpp-14", "gfortran-14", "gccgo-14",
+        "gdc-14", "gm2-14", "gccrs-14", "gnat-14", "gobjc-14", "gobjc++-14",
+        "libgcc-14-dev", "libstdc++-14-dev", "libgccjit-14-dev",
+        "libgcc-14-dev-arm64-cross", "libstdc++-14-dev-arm64-cross",
+        "cpp-14-aarch64-linux-gnu", "gfortran-14-aarch64-linux-gnu",
+        "gcc-14-base", "gcc-14-cross-base", "gcc-14-aarch64-linux-gnu-base",
+        "clang-19", "clang-tools-19", "clang-tidy-19", "clang-format-19",
+        "lld-19", "libomp-19-dev", "libc++-19-dev", "libc++1-19",
+    ),
+}
+# Runtime/-base names build.py's denylist governs; soname-stable in both
+# suites (libstdc++6 since gcc 3.4). Verified live 2026-09-04.
+DEBIAN_RUNTIME_PROBES = (
+    "libgcc-s1", "libstdc++6", "libgomp1", "libatomic1", "libgfortran5",
+    "libobjc4", "libgccjit0", "libgnat-14", "libgcc-s1-arm64-cross",
+    "libstdc++6-arm64-cross", "libomp5-18", "libclang1-18", "libclang-cpp18",
+    "libunwind-18",
+)
+
 
 def debian_inventory(text: str) -> dict:
-    native, cross, devlibs, other = {}, {}, {}, {}
+    """name -> version for every gcc/clang-family package, bucketed."""
+    out: dict[str, dict[str, str]] = {s: {} for s, _ in _DEBIAN_RULES}
+    other: dict[str, str] = {}
     for stanza in text.split("\n\n"):
         pm = re.search(r"^Package: (\S+)$", stanza, re.M)
         vm = re.search(r"^Version: (\S+)$", stanza, re.M)
         if not pm or not vm:
             continue
         name, version = pm.group(1), vm.group(1)
-        if re.match(r"^(gcc|clang)-(\d+)$", name):
-            native[name] = version
-        elif re.match(r"^gcc-(\d+)-([a-z0-9][a-z0-9+]*-linux-gnu[a-z0-9+]*)$", name):
-            cross[name] = version
-        elif re.match(r"^libgcc-(\d+)-dev-([a-z0-9]+)-cross$", name):
-            devlibs[name] = version
-        elif re.match(r"^(gcc|clang|libgcc|g\+\+)", name):
-            other[name] = version
-    return {"compilers": native, "cross_compilers": cross,
-            "cross_dev_libs": devlibs, "other_compiler_packages": other}
+        for section, rule in _DEBIAN_RULES:
+            if rule.match(name):
+                out[section][name] = version
+                break
+        else:
+            if _DEBIAN_STEMS_RE.match(name):
+                other[name] = version
+    out["other_compiler_packages"] = other
+    return out
 
 
 # ---------------------------------------------------------- classification
@@ -973,8 +1072,13 @@ def cmd_generate() -> int:
     debian = {suite: debian_inventory(lzma.decompress(fetch(DEBIAN_INDEX.format(suite))).decode())
               for suite in DEBIAN_SUITES}
     for suite, inv in debian.items():
-        if not inv["compilers"] or not inv["cross_compilers"]:
-            print(f"GUARD: debian {suite} inventory looks empty", file=sys.stderr)
+        empty = sorted(s for s, d in inv.items() if not d)
+        merged = set().union(*(set(d) for d in inv.values()))
+        probes = list(DEBIAN_SERIES_PROBES[suite]) + list(DEBIAN_RUNTIME_PROBES)
+        missing = [p for p in probes if p not in merged]
+        if empty or missing:
+            print(f"GUARD: debian {suite} inventory degraded: empty sections "
+                  f"{empty}, missing probes {missing}", file=sys.stderr)
             return 1
     catalog = build_catalog(listing, yaml_ref, served, nightlies, debian)
     CATALOG.write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n")
@@ -1056,6 +1160,44 @@ def cmd_selftest() -> int:
             print("  ", p)
         print(f"  names_fake={names_fake} names_removed={names_removed}")
         rc = 1
+
+    # Scrape routing control: a synthetic index fragment must bucket as
+    # expected, and the look-alike packages the stems guard against must
+    # stay unrecorded. Fails if a rule regression drops or misroutes a class.
+    routed = ["gcc-15", "gfortran-15-aarch64-linux-gnu",
+              "libgcc-15-dev-arm64-cross", "libstdc++-15-dev",
+              "libclang-rt-18-dev", "libomp-19-dev", "libgcc-s1", "libgnat-14",
+              "gcc-15-base", "gcc-15-cross-base", "gcc-15-sh4-linux-gnu-base",
+              "libc++1-19", "libomp5-18", "clang-tools-19", "lld-19",
+              "gfortran-15-doc"]
+    excluded = ["lldpd", "lldpad", "cppcheck", "cppman", "libobjcryst0",
+                "libompl17", "libomp-jonathonl-dev", "libclang-perl",
+                "libgnatcoll-dev", "libunwind8"]
+    fixture = "\n\n".join(f"Package: {n}\nVersion: 15.2.0-2\n"
+                          for n in routed + excluded)
+    inv = debian_inventory(fixture)
+    expect = {
+        "compilers": {"gcc-15", "clang-tools-19", "lld-19"},
+        "cross_compilers": {"gfortran-15-aarch64-linux-gnu"},
+        "cross_dev_libs": {"libgcc-15-dev-arm64-cross"},
+        "native_dev_libs": {"libstdc++-15-dev", "libclang-rt-18-dev",
+                            "libomp-19-dev"},
+        "runtime_and_base_packages": {
+            "libgcc-s1", "libgnat-14", "gcc-15-base", "gcc-15-cross-base",
+            "gcc-15-sh4-linux-gnu-base", "libc++1-19", "libomp5-18"},
+        "other_compiler_packages": {"gfortran-15-doc"},
+    }
+    wrong = ([f"{s}={sorted(inv[s])}" for s, want in expect.items()
+              if set(inv[s]) != want]
+             + [f"recorded excluded name: {n}" for n in excluded
+                if any(n in d for d in inv.values())])
+    if wrong:
+        print("selftest FAIL: debian inventory routing wrong:")
+        for w in wrong:
+            print("  ", w)
+        rc = 1
+    else:
+        print("selftest: debian inventory routes the fixture into the right buckets")
     return rc
 
 
