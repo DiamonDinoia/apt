@@ -182,8 +182,8 @@ homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 install = "passthrough"
 repo = "DiamonDinoia/juno-kde-fancontrol"
 tag = "builds"
-asset = '^juno-kde-fancontrol_[^_]+_all\.deb$'
-version_re = '^juno-kde-fancontrol_([^_]+)_all\.deb$'
+asset = '^juno-kde-fancontrol_[^_]+_amd64\.deb$'
+version_re = '^juno-kde-fancontrol_([^_]+)_amd64\.deb$'
 description = "fan control and system monitor for Juno (Clevo) laptops"
 homepage = "https://github.com/DiamonDinoia/juno-kde-fancontrol"
 
