@@ -15,6 +15,10 @@ on:
         description: "comma-separated subset of sid,trixie"
         default: "sid,trixie"
         required: true
+  # CI-probing while this file lives only on the team branch (dispatch
+  # requires the workflow on the default branch); removed once validated.
+  push:
+    branches: [team/4-compiler-matrix]
 
 permissions:
   contents: read
@@ -37,8 +41,8 @@ jobs:
       - id: plan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHARD_N: ${{ inputs.shards }}
-          BASELINES: ${{ inputs.baselines }}
+          SHARD_N: ${{ inputs.shards || '4' }}
+          BASELINES: ${{ inputs.baselines || 'sid,trixie' }}
         run: |
           set -euo pipefail
           python3 - <<'EOF'
