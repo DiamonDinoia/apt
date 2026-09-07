@@ -613,8 +613,11 @@ set -euo pipefail
 prep
 
 echo "== LEG A: distro resolution against the live archive"
+# The plan table rides fd 9, not stdin: a body command that consumed stdin
+# (script(1) forwards it into the pty, provably) would silently drop the
+# remaining emit names. fd 9 + a dead stdin makes the drop impossible.
 shipped=0; ours_only=0
-while IFS=$'\t' read -r name ver; do
+while IFS=$'\t' read -r -u 9 name ver; do
     pol=$(apt-cache policy "$name")
     if grep -qE '^\s+[0-9]+\s+https?://' <<<"$pol"; then
         shipped=$((shipped + 1))
@@ -638,13 +641,13 @@ while IFS=$'\t' read -r name ver; do
             *) fail "leg-A: $name Inst line is not our offer: $(inst_line "$name" install "$name")" ;;
         esac
     fi
-done < <(python3 - <<'PY'
+done 9< <(python3 - <<'PY'
 import json
 lite = json.load(open("/tlib/spec-lite.json"))
 for n, b in sorted(lite["emits"].items()):
     print(n, b["version"], sep="\t")
 PY
-)
+) < /dev/null
 [ "$ours_only" -ge 3 ] ||
     fail "leg-A non-vacuity: only $ours_only archive-absent names (want >= 3)"
 ok "leg-A non-vacuity: $ours_only archive-absent names, all resolve ours"
@@ -818,12 +821,19 @@ for f in json.load(open("/tlib/bplan.json"))["fixtures"]:
     print(f["name"], f["class"], f["fallback"], " ".join(f["marks"]), sep="\t")
 PY
 [ -s /tmp/bplan.tsv ] || fail "leg-B non-vacuity: no fixtures selected"
-while IFS=$'\t' read -r n c fb ms; do
+# fd 9 for the plan, dead stdin for the body: script(1) in handover_leg
+# forwards its stdin into the pty, and a /tmp/bplan.tsv on stdin loses every
+# fixture after the first (measured 2026-09-07: the cross fixture vanished
+# while the run still read ALLPASS from the surviving legs).
+while IFS=$'\t' read -r -u 9 n c fb ms; do
     read -ra marks <<<"$ms"
     flip=noflip; [ "$i" = 0 ] && flip=flip
     handover_leg "$n" "$c" "$fb" "$flip" "${marks[@]}"
     i=$((i + 1))
-done < /tmp/bplan.tsv
+done 9< /tmp/bplan.tsv < /dev/null
+planned=$(wc -l < /tmp/bplan.tsv)
+[ "$i" = "$planned" ] ||
+    fail "leg-B: ran $i of $planned planned fixtures — a body command ate the plan input"
 echo "PASS leg-b"
 SH
 chmod 755 "$work/lib/leg_b.sh"
