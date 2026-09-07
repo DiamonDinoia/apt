@@ -39,11 +39,11 @@ provide, so it can never shadow Debian:
 
     Package: diamondinoia-apt diamondinoia-repo-cuda diamondinoia-repo-juno act
      lazygit stylua galaxybudsclient ghostty discord zoom clion zed watchexec
-     difftastic lua-language-server
+     difftastic lua-language-server intel-sde
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
-    Package: juno-drivers-diamon
+    Package: juno-drivers-diamon clevo-keyboard-dkms juno-kde-fancontrol
     Pin: release l=diamondinoia
     Pin-Priority: 500
 

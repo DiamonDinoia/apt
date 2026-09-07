@@ -10,7 +10,9 @@
 #
 # The version comes from the publisher: a GitHub release tag with a leading "v"
 # stripped, a version_re applied to a JSON feed, or a version_re applied to the
-# path a plain URL redirects to.
+# path a plain URL redirects to. A fourth flavor fetches a small `text` page and
+# applies `text_re` to it; the regex's named groups drive the `url` and
+# `version` templates.
 
 [act]
 install = "member"
@@ -151,6 +153,31 @@ homepage = "https://luals.github.io"
 license = "MIT"
 section = "devel"
 
+# Intel's marketing page is bot-blocked, so the version oracle is the AUR
+# PKGBUILD, whose `_pkgver` carries kit::version-date. The URL template rebuilds
+# the CDN payload URL from the same groups; the payload answers HEAD and GET
+# with no cookie wall. The Debian version cannot keep upstream's `-2026-07-28`
+# suffix: dpkg splits upstream from revision at the last dash, which would read
+# revision "28". It becomes `10.13.1+20260728` — `+` stays inside upstream and
+# dates are unique per release, so ordering is preserved.
+[intel-sde]
+install = "tree"
+text = "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=intel-sde"
+text_re = '_pkgver:=(?P<kit>\d+)::(?P<num>[0-9.]+)-(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'
+url = "https://downloadmirror.intel.com/{kit}/sde-external-{num}-{y}-{m}-{d}-lin.tar.xz"
+version = "{num}+{y}{m}{d}"
+# The tree ships sde/sde64/xed/xed64 at its root, not under bin/. `sde` is the
+# 32-bit i386 driver (would need libc6:i386); on amd64 the usable entry point
+# is sde64, which AUR links the same way. xed stays internal: it has its own
+# Debian story in binutils.
+launcher = ["sde64"]
+links = { sde = "sde64" }
+description = "Intel Software Development Emulator"
+homepage = "https://www.intel.com/content/www/us/en/developer/articles/tool/software-development-emulator.html"
+license = "Proprietary, Intel Simplified Software License"
+section = "devel"
+depends = "libc6"
+
 # Juno's own drivers, forked and modified in DiamonDinoia/juno-drivers-debian,
 # whose CI builds and container-tests the package and attaches it to its
 # `builds` release. The payload is the package: the wrappers would drop the
@@ -169,6 +196,20 @@ version_re = '^juno-drivers-diamon_([^_]+)_amd64\.deb$'
 # container test installs the source package first, exactly as a user would.
 with = ["diamondinoia-repo-juno"]
 description = "Juno drivers with local GRUB and CPU policy, forked build"
+homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
+
+# The keyboard/backlight dkms payload the same fork build now emits beside
+# juno-drivers-diamon. It deposes Juno's unpatched clevo-keyboard deb via
+# Conflicts/Replaces/Provides and juno-drivers-diamon Recommends it, so the
+# index must carry it. The dh_dkms maintainer scripts are the package, hence
+# passthrough again.
+[clevo-keyboard-dkms]
+install = "passthrough"
+repo = "DiamonDinoia/juno-drivers-debian"
+tag = "builds"
+asset = '^clevo-keyboard-dkms_[^_]+_amd64\.deb$'
+version_re = '^clevo-keyboard-dkms_([^_]+)_amd64\.deb$'
+description = "Clevo keyboard/backlight driver (dkms) for Juno laptops, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
 # The fan stack for the same laptops, from DiamonDinoia/juno-kde-fancontrol,
