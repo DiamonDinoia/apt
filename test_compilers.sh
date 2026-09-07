@@ -85,8 +85,12 @@
 #                 flip can be blamed on (or cleared of) a base-image move.
 #   Controls      host-side comparator selftests run first (synthetic
 #                 surprise/resolve/rename ldd sets and zz-new-frontend must
-#                 be refused); the UX leg proves its own abort classifier on
-#                 the single-name and fixture-removed arms; a stamps tripwire
+#                 be refused) plus compilers_verdict.py --selftest (synthetic
+#                 jobs dirs missing out/ artifacts must come back as FAIL
+#                 rows with non-zero exit, no traceback, no forged E13
+#                 verdicts on absent evidence); the UX leg proves its own
+#                 abort classifier on the single-name and fixture-removed
+#                 arms; a stamps tripwire
 #                 (same shape as test_failure_modes.sh) refuses a run that
 #                 skipped a check class.
 #   Floor         8 bundles today (9 mirrored payloads; the two dated
@@ -352,6 +356,15 @@ print("ok    comparator controls: 3 ldd mutations refused; "
       "zz-new-frontend reported; a dropped tool reported")
 PYCTL
 stamp comparators
+
+# The verdict collector (compilers_verdict.py) selftest: synthetic evidence
+# trees missing out/ artifacts must come back as clean FAIL rows with a
+# non-zero exit and no traceback; a complete tree must pass; E13 must still
+# fire on evidence that exists. This class shipped red in run 34158756678 as
+# a FileNotFoundError traceback plus forged E13 rows for payloadless jobs.
+python3 "$root/compilers_verdict.py" --selftest ||
+  { echo "FAIL  collector selftest"; exit 1; }
+stamp collector_selftest
 
 # Regime-3 fixture (E21/E27): two pending unversioned-analog bundles
 # synthesized with the exact P/C/R pcr_sets computes for them.
@@ -879,205 +892,11 @@ stamp jobs_ran
 printf '%s\n' $bases > "$tmp/bases"
 
 # --------------------------------------------------------------- verdicts
-python3 - "$root" "$tmp" <<'PYVERDICT'
-import re
-import sys
-import datetime
-import json
-import os
-
-root, tmp = sys.argv[1:3]
-fails = []
-
-
-def fail(msg):
-    print(f"FAIL  {msg}")
-    fails.append(msg)
-
-
-def ldd_diff(actual, expected):
-    return sorted(set(map(tuple, actual)) - set(map(tuple, expected))), \
-           sorted(set(map(tuple, expected)) - set(map(tuple, actual)))
-
-
-def bin_diff(present, launcher, links, exclusions):
-    exp = {launcher.split("/", 1)[1]}
-    exp.update(t.split("/", 1)[1] for t in links)
-    exp.update(exclusions)
-    return sorted(set(present) - exp), sorted(exp - set(present))
-
-
-flags = json.load(open(f"{tmp}/flags.json"))
-bases = open(f"{tmp}/bases").read().split()
-slice_names = [l.strip() for l in open(f"{tmp}/shard.tsv") if l.strip()]
-matrix = []
-
-# The recorded payload-readelf spellings of target machines the stock
-# spelling does not cover. Numeric e_machine (manifest-measured at mirror
-# time) is the identity anchor; Kalray's binutils rebrands EM_KVARC, measured
-# 2026-09-05 on k1-gcc-7.5.0's payload readelf.
-ARCH_ALIASES = {"KM211 KVARC processor": {"Kalray-1 Processor"}}
-
-for name in slice_names:
-    for base in bases:
-        d = f"{tmp}/jobs/{name}.{base}"
-        meta = json.load(open(f"{d}/expect.json"))
-        rp = f"{d}/out/report"
-        report = open(rp).read().splitlines() if os.path.exists(rp) else []
-        for line in report:
-            print(f"     {name}/{base}: {line}")
-        if not os.path.exists(f"{d}/out/rc"):
-            fail(f"{name}/{base}: container left no rc marker "
-                 "(died mid-check — see container.log)")
-            matrix.append((name, base, "DEAD"))
-            continue
-        rcv = open(f"{d}/out/rc").read().strip()
-        for line in report:
-            if line.startswith("FAIL"):
-                fails.append(f"{name}/{base}: {line}")
-
-        pairs = []
-        p = f"{d}/out/ldd.pairs"
-        if os.path.exists(p):
-            pairs = [l.split("\t", 1) for l in open(p) if "\t" in l]
-        bp = [(os.path.basename(f), s.strip()) for f, s in pairs]
-        if len(set(map(tuple, bp))) != len(bp):
-            fail(f"{name}/{base}: ambiguous (basename, soname) duplicates "
-                 f"in the sweep: {sorted(bp)}")
-        surprise, missing = ldd_diff(bp, meta["expect"])
-        if surprise:
-            fail(f"{name}/{base}: ldd sweep surprise not-found: {surprise}")
-        if missing:
-            fail(f"{name}/{base}: recorded ldd exception unexpectedly "
-                 f"resolved: {missing}")
-        if not surprise and not missing and len(set(bp)) == len(bp):
-            print(f"      {name}/{base}: ldd sweep exact "
-                  f"({len(bp)} exception pair(s), 0 surprises)")
-
-        present = [l.strip() for l in open(f"{d}/out/bin.present") if l.strip()]
-        extra, gone = bin_diff(present, meta["bin"]["launcher"],
-                               meta["bin"]["links"],
-                               meta["bin"]["exclusions"])
-        if extra:
-            fail(f"{name}/{base}: bin/ names neither linked nor excluded: "
-                 f"{extra}")
-        if gone:
-            fail(f"{name}/{base}: dump-spec bin/ names absent from the "
-                 f"payload: {gone}")
-        if not extra and not gone:
-            print(f"      {name}/{base}: all {len(present)} bin/ names "
-                  "linked or excluded")
-
-        if not meta["native"] and base == "sid":
-            rd = f"{d}/out/arch.readelf"
-            if not os.path.exists(rd):
-                fail(f"{name}/{base}: no payload-readelf evidence")
-            else:
-                txt = open(rd).read()
-                m = re.search(r"Machine:\s*(.+)", txt)
-                em = re.search(r"emachine=(\d+)", txt)
-                machine = m.group(1).strip() if m else ""
-                want = meta["expected_arch"]
-                allowed = {want} | ARCH_ALIASES.get(want, set())
-                if machine not in allowed and not re.fullmatch(
-                        r"<unknown>: 0x[0-9a-f]+", machine):
-                    fail(f"{name}/{base}: Machine '{machine}' not in "
-                         f"{sorted(allowed)}")
-                if not em or int(em.group(1)) != meta["target_emachine"]:
-                    fail(f"{name}/{base}: e_machine "
-                         f"{em and em.group(1)} != manifest "
-                         f"{meta['target_emachine']}")
-                if os.path.exists(f"{d}/out/arch.objdump"):
-                    if "architecture:" not in open(f"{d}/out/arch.objdump") \
-                            .read():
-                        fail(f"{name}/{base}: payload objdump printed no "
-                             "architecture line")
-                if m and em and int(em.group(1)) == meta["target_emachine"]:
-                    print(f"      {name}/{base}: arch '{machine}' "
-                          f"(e_machine {em.group(1)}) vs catalog '{want}'")
-        matrix.append((name, base,
-                       "ok(%s%s)" % (meta["level"],
-                                     "/cutoff" if meta["cutoff"] else "")
-                       if rcv == "0" and not any(
-                           f.startswith(f"{name}/{base}:") for f in fails)
-                       else "FAIL"))
-
-# The clang cutoff trial row: written ONCE (or under --remeasure), relr
-# byte-preserved, whole file canonical.
-EXC = f"{root}/exceptions.json"
-raw_before = open(EXC, "rb").read()
-doc = json.loads(raw_before)
-relr_before = json.dumps(doc["relr"], indent=2, sort_keys=True)
-need_row = flags["remeasure"] or "clang_cutoff" not in doc.get("cutoff", {})
-trial = f"{tmp}/jobs/clang-3.3.sid/out/trial.facts"
-if need_row:
-    if os.path.exists(trial):
-        facts = dict(l.rstrip("\n").split("=", 1) for l in open(trial)
-                     if "=" in l)
-        result = ("3.3: plain C link fails ('cannot find crtbegin.o': the "
-                  "driver predates multiversion GCC discovery; "
-                  "--gcc-toolchain is unrecognized); C with -B/-L "
-                  f"{facts.get('crtd', '?')} compiles and runs "
-                  f"({facts.get('injected_c', '?')}); C++ fails on "
-                  f"{facts.get('extras', '?').split()[-1]} headers "
-                  f"({facts.get('cxx_evidence', '?')})")
-        today = datetime.date.today().isoformat()
-        doc["cutoff"]["clang_cutoff"] = {
-            "measured": today,
-            "policy": "clang series ≤3.9 → L1",
-            "result": result}
-        canon = json.dumps(doc, indent=2, sort_keys=True) + "\n"
-        open(EXC, "w").write(canon)
-        after = json.loads(open(EXC).read())
-        assert json.dumps(after["relr"], indent=2, sort_keys=True) == \
-            relr_before, "the relr section moved on write"
-        assert open(EXC, "rb").read() == canon.encode(), \
-            "exceptions.json is not canonical after write"
-        print(f"==> CUT: recorded clang_cutoff trial (measured {today}); "
-              "relr section byte-identical")
-    else:
-        fail("the cutoff trial was required but clang-3.3/sid left no "
-             "trial.facts (is clang-3.3 in this shard, and did the run "
-             "include the sid baseline?)")
-else:
-    print("==> cutoff: recorded row read back; probes asserted against it")
-
-ux = f"{tmp}/ux/report"
-if os.path.exists(ux):
-    for line in open(ux):
-        line = line.rstrip("\n")
-        print(f"     ux: {line}")
-        if line.startswith("FAIL"):
-            fails.append(f"ux: {line}")
-else:
-    fail("install-UX leg left no report")
-rcx = f"{tmp}/ux/rc"
-if not os.path.exists(rcx):
-    fail("install-UX leg left no rc marker")
-elif open(rcx).read().strip() != "0":
-    fail("install-UX leg rc != 0")
-
-print()
-print("== matrix (bundle x baseline -> verdict) ==")
-for name, base, res in matrix:
-    print(f"  {name:34s} {base:7s} {res}")
-floor = json.load(open(f"{tmp}/floor.json"))
-print(f"== floor: {len(floor['emit_floor'])} bundles mirrored; "
-      f"{floor['pending_total']} catalog payloads pending-mirror "
-      f"({floor['pending_slot']} in this shard) — "
-      "installed-only runs never go green on a pending entry")
-
-if fails:
-    print()
-    for f in fails:
-        print(f"FAIL  {f}")
-    sys.exit(1)
-print(f"ALLPASS ({len(matrix)} matrix jobs + install-UX legs)")
-PYVERDICT
+python3 "$root/compilers_verdict.py" "$root" "$tmp"
 
 # Tripwire: a run that silently skipped a check class must not pass.
 missing=$(comm -13 <(sort "$tmp/stamps") \
-  <(printf '%s\n' digests slice comparators regime3_fixture jobs_ran | sort))
+  <(printf '%s\n' digests slice comparators collector_selftest regime3_fixture jobs_ran | sort))
 [ -z "$missing" ] || { echo "FAIL  check classes did not run: $missing"; exit 1; }
 
 echo "==> all compiler-matrix classes green ($(wc -l < "$tmp/stamps") stamps)"
