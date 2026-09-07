@@ -1704,8 +1704,20 @@ def selftest() -> int:
                f"{len(p17['links'])} links, {dict(classes)}")
         expect("gcc-17: 73 bin/ executables accounted for",
                len(p17["links"]) + 1 + len(p17["link_exclusions"]) == 73)
-    expect("the mirror gate leaves the pending remainder loud",
-           pending > 200, str(pending))
+    # --- pending gate: payloads without an analyzed manifest row are skipped
+    # and counted, never silently emitted. The completed mirror leaves pending
+    # at zero; dropping one row must move exactly its payload into the count.
+    expect("the completed mirror leaves zero pending", pending == 0,
+           str(pending))
+    victim = plans["gcc-16"]["payload"]["asset"]
+    rowless = {**manifest,
+               "rows": {k: v for k, v in manifest["rows"].items()
+                        if k != victim}}
+    reduced, reduced_pending = bundle_plans(catalog, rowless)
+    expect("a dropped row moves its payload into pending, loudly",
+           reduced_pending == pending + 1
+           and reduced["gcc-16"]["state"].startswith("pending"),
+           f"{pending} -> {reduced_pending}")
 
     print("selftest:", "clean" if rc == 0 else "FAILURES above")
     return rc
