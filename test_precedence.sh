@@ -200,9 +200,9 @@ Ledger grammar (measured: apt 3.0.3 on trixie, 3.2.0 on sid):
   real: Unpacking name (new) [over (old)] ... / Removing name (old) ...
 Origin spellings (measured): the distribution 'Debian:unstable'; the
 stand-in's signed flat Release (Origin/Suite set) renders 'standin:standin';
-the local build renders 'diamondinoia:now' (apt-ftparchive without a Suite
-option). The comparer's set algebra keys on names only; the origin strings
-are asserted in the leg bodies whose business is resolution order.
+the local build renders 'diamondinoia:localhost' (file:// site, no Suite
+option set). The comparer's set algebra keys on names only; the origin
+strings are asserted in the leg bodies whose business is resolution order.
 """
 import json, re, sys
 
@@ -1020,7 +1020,11 @@ prep
 
 echo "== LEG C reverse: full stand-in stack, then our bundle by path"
 gcc16_stubs
-apt-get -y install gcc-16 g++-16 libstdc++-16-dev >/dev/null
+# libc6-dev in the prestate mirrors a machine that had a working distro C++
+# stack; it also keeps apt's ancillary archive pull out of the asserted
+# universe (the expectation model covers the family + ours, not the archive's
+# own dependency closure, and apt seeds it inconsistently per baseline).
+apt-get -y install gcc-16 g++-16 libstdc++-16-dev libc6-dev >/dev/null
 for n in gcc-16 g++-16 libstdc++-16-dev; do
     dpkg-query -W -f '${Status}\n' "$n" 2>/dev/null | grep -q '^install ok installed' ||
         fail "leg-C reverse: the stand-in stack did not install $n"
@@ -1064,6 +1068,13 @@ apt-mark showauto | grep -qx 'gcc-16-base' ||
     fail "leg-C reverse: gcc-16-base did not survive as an auto (orphan)"
 dpkg-query -W -f '${Status}\n' cpp-16 2>/dev/null | grep -q '^install ok installed' ||
     fail "leg-C reverse: cpp-16 was removed though ours never conflicts it"
+# and the defer regime must hold on disk: /usr/bin/cpp-16 was a
+# distribution-owned path at our postinst time, so the guarded link creation
+# kept it (S3c); it must still answer the stand-in's marker, not point at us
+stub_marker /usr/bin/cpp-16 cpp-16 "$GCC16_STUB_W"
+[ -L /usr/bin/cpp-16 ] &&
+    fail "leg-C reverse: /usr/bin/cpp-16 became a link — the postinst guard did not hold" || :
+ok "leg-C reverse: /usr/bin/cpp-16 kept the distribution-owned path (S3c guard)"
 for rt in libgcc-s1 libstdc++6; do
     dpkg-query -W -f '${Status}\n' "$rt" 2>/dev/null | grep -q '^install ok installed' ||
         fail "leg-C reverse: runtime package $rt was removed"
