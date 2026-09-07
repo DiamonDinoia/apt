@@ -86,6 +86,9 @@ Bundle internals (settled; do not relitigate):
             corpus is the constructive lower forms `<series>-0`,
             `<series>.0.0-1` and `<upstream>-1` (the least shapes Debian could
             spell that series/lineage). A violation fails the build naming it.
+            The at-lines have no Debian series and spell
+            `<upstream>~ce<series>-R` instead (a dpkg version starts with a
+            digit), ordered against the upstream lineage.
   Links     the payload's bin/ universe (FILE + hardlink + symlink members,
             from the manifest analysis) partitions into Debian-spelled links
             and excluded-with-reason names; see LINK RULES below. The tables
@@ -848,6 +851,9 @@ BINUTILS = {
     "addr2line", "ar", "as", "c++filt", "dwp", "elfedit", "gprof", "gprofng",
     "ld", "ld.bfd", "ld.gold", "nm", "objcopy", "objdump", "ranlib", "readelf",
     "size", "strings", "strip",
+    # binutils' own extra spellings: embedspu is its PowerPC SPU image
+    # embedder (binutils/embedspu.sh), ld-new the build tree's pre-install ld.
+    "embedspu", "ld-new",
 }
 # go, gofmt and the four cgo helpers gccgo runs are Go programs linked against
 # the payload's libgo with no rpath to it; they exit 127 from PATH. The cgo
@@ -855,6 +861,19 @@ BINUTILS = {
 GO_LIBGO = {"go", "gofmt", "buildid", "cgo", "test2json", "vet"}
 NO_SERIES_SPELLING = {"c++", "cc"}        # Debian gives these no -NN spelling
 GCCBUG = {"gccbug"}                       # era script, mails bug reports
+# GNAT's source-navigation pair, carried only by series ≤11 payloads; its one
+# Debian spelling is the gnat-11 split's, outside the gnat driver set
+# GCC_TOOLS fixes.
+GNAT_AUX = {"gnatfind", "gnatxref"}
+# The crosstool-built target debugger. Debian ships no <triplet>-gdb spelling
+# at all; cross debugging comes from the host's gdb-multiarch package.
+BUNDLED_GDB = {"gdb", "gdb-add-index"}
+# Stripped base of avr-man: a man(1) shim for the payload's own doc tree.
+# Debian's gcc-avr namespace spells no such helper.
+MAN_SHIM = {"man"}
+# crosstool CT_TARGET_ALIAS second spellings. CE's bpf build installs every
+# tool under bpf-unknown- beside the real bpf-unknown-none- target prefix.
+CT_TARGET_ALIAS = {"bpf-unknown-none": "bpf-unknown"}
 # clang-family plumbing: build-time generators, driver wrappers and test rigs
 # that are not user entry points of the clang-N namespace.
 CLANG_INTERNAL = {
@@ -867,6 +886,10 @@ LLVM_EXACT = {  # llvm-N / lld-N namespace, shippable but not ours to spell
     "dsymutil", "sancov", "sanstats", "bugpoint", "macho-dump",
     "verify-uselistorder", "reduce-chunk-list", "offload-arch",
     "amdgpu-arch", "nvptx-arch", "lld-link",
+    # obj2yaml/yaml2obj live in llvm-N, split-file in llvm-N-tools; the
+    # ld64.lld.darwin{new,old} era spellings (clang 12/13) ride the
+    # ld64.lld. prefix in classify_bin.
+    "obj2yaml", "yaml2obj", "split-file",
 }
 # Payload-native plumbing for cross and exotic trees: crosstool helpers and
 # NetBSD host build tools (vax). Not compiler entry points.
@@ -890,6 +913,15 @@ EXCLUSION_REASONS = {
         "package deliberately does not do",
     "gccbug":
         "era bug-report script, not a compiler",
+    "gnat-aux":
+        "GNAT's find/xref pair, spilled by series ≤11 payloads only; outside "
+        "the gnat driver set this bundle links",
+    "bundled-gdb":
+        "the crosstool build bundles a target gdb; Debian ships no "
+        "<triplet>-gdb spelling (cross debugging comes from gdb-multiarch)",
+    "man-shim":
+        "man(1) shim for the payload's own doc tree; Debian's gcc-avr "
+        "namespace spells no such helper",
     "llvm-suite":
         "belongs to the llvm-N/lld-N namespace; out of the clang-N "
         "namespace this bundle claims",
@@ -925,12 +957,30 @@ def classify_bin(name: str, *, kind: str, triplets: list[str]) -> str | None:
                 return "triplet-alias"
             base = base[len(t) + 1:]
             stripped += 1
+    # Crosstool leaks two extra spellings of the same tools: an empty-target
+    # copy ("-<tool>", e.g. the gcc-5-armhf payload) and a CT_TARGET_ALIAS
+    # second prefix (bpf-unknown beside bpf-unknown-none). Strip one such
+    # prefix and classify the base; a linkable base below is an alias of a
+    # driver already linked, never a link of its own.
+    aliased = False
+    if base.startswith("-"):
+        aliased = True
+        base = base[1:]
+    else:
+        for t in triplets:
+            alias = CT_TARGET_ALIAS.get(t)
+            if alias and base.startswith(alias + "-"):
+                aliased = True
+                base = base[len(alias) + 1:]
+                break
     if stripped > 1 and (base in GCC_TOOLS or base in CLANG_TOOLS):
         return "triplet-alias"
     if _TOOL_DUP_RE.fullmatch(base):
         return "triplet-alias"
     if base in GCC_TOOLS or base in CLANG_TOOLS:
-        return None                      # the tool table links this
+        # An aliased copy is a spelling of a driver already linked; a plain
+        # one is None — the tool table links it.
+        return "triplet-alias" if aliased else None
     if base in GO_LIBGO:
         return "go-libgo"
     if base in NO_SERIES_SPELLING:
@@ -939,8 +989,14 @@ def classify_bin(name: str, *, kind: str, triplets: list[str]) -> str | None:
         return "gccbug"
     if base in BINUTILS or base.startswith(("gprofng-", "gp-")):
         return "bundled-binutils"
+    if base in GNAT_AUX:
+        return "gnat-aux"
+    if base in BUNDLED_GDB:
+        return "bundled-gdb"
+    if base in MAN_SHIM:
+        return "man-shim"
     if kind == "clang":
-        if base.startswith("llvm-") or base in LLVM_EXACT:
+        if base.startswith(("llvm-", "ld64.lld.")) or base in LLVM_EXACT:
             return "llvm-suite"
         if base in CLANG_INTERNAL or base.startswith("clang-ssaf-"):
             return "payload-internal"
@@ -1165,6 +1221,31 @@ def load_bundle_inputs() -> tuple[dict, dict, dict]:
     return catalog, manifest, exceptions
 
 
+# Admitted name-vs-probe drift, exact (recorded, probed) per bundle name: CE
+# labels these assets at a branch point, but the tarball inside snapshots the
+# branch later. The catalog's asset-spelled version names the deb regardless;
+# each admission is per entry, never a relaxed predicate.
+DRIFT_ADMITTED = {
+    "gcc-7-avr": ("7.3.0", "7.5.0"),
+    "gcc-11-powerpc64-linux-gnu": ("11.2.0", "11.5.0"),
+    "gcc-11-tricore": ("11.3.0", "11.3.1"),
+}
+
+
+def version_drift(name: str, family: str, recorded: str, probed: str) -> bool:
+    """True when the catalog-recorded and payload-probed versions genuinely
+    disagree. LLVM 16 moved the resource dir to lib/clang/<major>/ (the
+    version mirror.py probes), so a clang point release probes its major only:
+    a recorded point of the probed lineage is not drift. Anything else is
+    drift unless exactly admitted above.
+    """
+    if recorded == probed:
+        return False
+    if family.startswith("clang") and recorded.startswith(probed + "."):
+        return False
+    return DRIFT_ADMITTED.get(name) != (recorded, probed)
+
+
 def trunk_bundle_identity(fam: str, rec: dict, row: dict) -> tuple[str, str | None]:
     """deb name and triplet of a trunk family row. Names come off the family's
     own rename scheme; an unknown scheme shape fails loudly."""
@@ -1209,7 +1290,11 @@ def bundle_plans(catalog: dict, manifest: dict) -> tuple[dict[str, dict], int]:
             cross_triplet=triplet if cross else None)
         pcr = pcr_sets(name, series=series, regime=regime, triplet=triplet,
                        cross=cross, upstream=upstream, inventory=inventory)
-        corpus = version_corpus(series, upstream, inventory)
+        # A non-Debian series (the at-lines) spells <upstream>~ce<series>-R
+        # instead, so the corpus lineage is the upstream version, not the
+        # unspellable series name.
+        corpus = version_corpus(series if series[0].isdigit() else upstream,
+                                upstream, inventory)
         bad = version_order_violations(version, corpus)
         if bad:
             raise SystemExit(f"{name}: version {version} does not sort below "
@@ -1268,10 +1353,17 @@ def bundle_plans(catalog: dict, manifest: dict) -> tuple[dict[str, dict], int]:
         if not upstream:
             raise SystemExit(f"{e['name']}: no version from name or payload")
         probed = analysis.get("gcc_version") or analysis.get("clang_version")
-        if e["version"] and probed and e["version"] != probed:
+        if e["version"] and probed \
+                and version_drift(e["name"], e["family"], e["version"], probed):
             raise SystemExit(f"{e['name']}: name carries {e['version']} but the "
                              f"payload probes {probed} — catalog/payload drift")
-        version = f"{e['series']}~ce{upstream}-{BUNDLE_REVISION}"
+        # The defer scheme's <series>~ce<upstream>-R presumes a Debian series,
+        # which starts with a digit. The IBM Advance Toolchain lines carry an
+        # "at12"/"at13" series (no Debian spelling); spell these
+        # <upstream>~ce<series>-R, versions still payload-truthful.
+        version = (f"{e['series']}~ce{upstream}-{BUNDLE_REVISION}"
+                   if e["series"][0].isdigit()
+                   else f"{upstream}~ce{e['series']}-{BUNDLE_REVISION}")
         plans[e["name"]] = plan(
             e["name"], family=e["family"], series=e["series"],
             regime=e["regime"], triplet=e["triplet"], version=version,
@@ -1439,6 +1531,143 @@ def selftest() -> int:
            dpkg_lt("17~trunk20260904", "17-20261001-1")
            and dpkg_lt("17~trunk20260904", "17.1.0-1"))
 
+    # --- bundle-floor classes and the name-vs-probe guard: synthetic
+    # crosstool bin/ universes through the real plan_links, one trip per
+    # defect class the completed mirror surfaced.
+    def plans_for(cat_trip, name, kind, fam_kind, triplets, bins,
+                  upstream="5.4.0"):
+        analysis = {"bin": bins, "gcc_targets": triplets,
+                    "gcc_version": None if fam_kind == "clang" else upstream,
+                    "clang_version": upstream if fam_kind == "clang" else None}
+        return plan_links(name, kind=kind, family_kind=fam_kind, series="0",
+                          catalog_triplet=cat_trip, analysis=analysis)
+
+    lp = plans_for("mips64-linux-gnuabi64", "gcc-0-mips", "cross", "gcc",
+                   ["mips64-unknown-linux-gnu"],
+                   ["mips64-unknown-linux-gnu-gcc",
+                    "mips64-unknown-linux-gnu-gcc-9.9.9",
+                    "mips64-unknown-linux-gnu-gdb",
+                    "mips64-unknown-linux-gnu-gdb-add-index",
+                    "mips64-unknown-linux-gnu-gnatfind",
+                    "mips64-unknown-linux-gnu-gnatxref",
+                    "mips64-unknown-linux-gnu-embedspu",
+                    "mips64-unknown-linux-gnu-ld-new"], "9.9.9")
+    got = {n: x["class"] for n, x in lp["link_exclusions"].items()}
+    expect("cross crosstool classes: gdb pair, gnat pair, embedspu, ld-new",
+           got == {"mips64-unknown-linux-gnu-gcc-9.9.9": "triplet-alias",
+                   "mips64-unknown-linux-gnu-gdb": "bundled-gdb",
+                   "mips64-unknown-linux-gnu-gdb-add-index": "bundled-gdb",
+                   "mips64-unknown-linux-gnu-gnatfind": "gnat-aux",
+                   "mips64-unknown-linux-gnu-gnatxref": "gnat-aux",
+                   "mips64-unknown-linux-gnu-embedspu": "bundled-binutils",
+                   "mips64-unknown-linux-gnu-ld-new": "bundled-binutils"}
+           and lp["launcher"] == "bin/mips64-unknown-linux-gnu-gcc", str(got))
+    lp = plans_for(None, "gcc-0-bpf", "nodebian", "gcc", ["bpf-unknown-none"],
+                   ["bpf-unknown-none-gcc", "bpf-unknown-gcc",
+                    "bpf-unknown-gcc-13.4.0", "bpf-unknown-cc",
+                    "bpf-unknown-addr2line"], "13.4.0")
+    got = {n: x["class"] for n, x in lp["link_exclusions"].items()}
+    expect("bpf CT_TARGET_ALIAS spelling partitioned",
+           got == {"bpf-unknown-gcc": "triplet-alias",
+                   "bpf-unknown-gcc-13.4.0": "triplet-alias",
+                   "bpf-unknown-cc": "no-series-spelling",
+                   "bpf-unknown-addr2line": "bundled-binutils"}
+           and lp["launcher"] == "bin/bpf-unknown-none-gcc", str(got))
+    lp = plans_for("arm-linux-gnueabihf", "gcc-0-arm", "cross", "gcc",
+                   ["arm-unknown-linux-gnueabihf"],
+                   ["arm-unknown-linux-gnueabihf-gcc", "-gcc", "-gcc-5.4.0",
+                    "-addr2line", "-ldd", "-populate"])
+    got = {n: x["class"] for n, x in lp["link_exclusions"].items()}
+    expect("empty-target alias leak (-<tool>) partitioned",
+           got == {"-gcc": "triplet-alias", "-gcc-5.4.0": "triplet-alias",
+                   "-addr2line": "bundled-binutils", "-ldd": "payload-internal",
+                   "-populate": "payload-internal"}, str(got))
+    lp = plans_for(None, "gcc-0-avr", "nodebian", "gcc", ["avr"],
+                   ["avr-gcc", "avr-man"])
+    expect("avr-man is the man-shim class",
+           {n: x["class"] for n, x in lp["link_exclusions"].items()}
+           == {"avr-man": "man-shim"})
+    lp = plans_for(None, "clang-0", "native", "clang", [],
+                   ["clang", "obj2yaml", "yaml2obj", "split-file",
+                    "ld64.lld", "ld64.lld.darwinnew", "ld64.lld.darwinold"],
+                   "15.0.7")
+    expect("era llvm/lld spellings land in llvm-suite",
+           {n: x["class"] for n, x in lp["link_exclusions"].items()}
+           == dict.fromkeys(["obj2yaml", "yaml2obj", "split-file",
+                             "ld64.lld", "ld64.lld.darwinnew",
+                             "ld64.lld.darwinold"], "llvm-suite"))
+    lp = plans_for(None, "gcc-0", "native", "gcc", ["x86_64-linux-gnu"],
+                   ["gcc", "gnatfind", "gnatxref"], "10.3.0")
+    expect("native gnatfind/gnatxref land in gnat-aux",
+           {n: x["class"] for n, x in lp["link_exclusions"].items()}
+           == {"gnatfind": "gnat-aux", "gnatxref": "gnat-aux"})
+    try:
+        plans_for("mips64-linux-gnuabi64", "gcc-0-mips", "cross", "gcc",
+                  ["mips64-unknown-linux-gnu"],
+                  ["mips64-unknown-linux-gnu-gcc",
+                   "mips64-unknown-linux-gnu-wat"], "9.9.9")
+        expect("unknown bin name aborts naming it", False, "no exception")
+    except SystemExit as e:
+        expect("unknown bin name aborts naming it", "-wat" in str(e), str(e))
+
+    # --- name-vs-probe guard predicate
+    expect("clang point vs major-only probe is no drift (LLVM 16 layout)",
+           not version_drift("clang-17", "clang", "17.0.1", "17"))
+    expect("a genuinely different probed major is drift",
+           version_drift("clang-17", "clang", "17.0.1", "18"))
+    expect("gcc family stays strict on point mismatch",
+           version_drift("gcc-16", "gcc", "16.2.0", "16.3.0"))
+    expect("tricore's admitted pair is no drift",
+           not version_drift("gcc-11-tricore", "gcc", "11.3.0", "11.3.1"))
+    expect("the same pair under another name still is",
+           version_drift("gcc-9", "gcc", "11.3.0", "11.3.1"))
+    mini_c = {"packaged": [{"name": "clang-17", "family": "clang",
+                            "series": "17", "regime": "debian",
+                            "triplet": "x86_64-linux-gnu", "version": "17.0.1",
+                            "asset": "clang-0.tar.xz", "smoke": "fail",
+                            "served": True}],
+              "trunk_families": {}, "debian": {}}
+
+    def mini_m(probed):
+        return {"meta": {"repo": "r", "release": "rel"},
+                "rows": {"clang-0.tar.xz": {
+                    "asset": "clang-0.tar.xz", "sha256": "0" * 64, "size": 1,
+                    "analysis": {"bin": ["clang"], "clang_version": probed,
+                                 "needed": [], "has_binutils": True,
+                                 "root": {"strip": 1}}}}}
+    plans, _ = bundle_plans(mini_c, mini_m("17"))
+    expect("bundle-level: 17.0.1 vs probe 17 emits 17~ce17.0.1-1",
+           plans["clang-17"]["state"] == "emit"
+           and plans["clang-17"]["version"] == "17~ce17.0.1-1")
+    try:
+        bundle_plans(mini_c, mini_m("18"))
+        expect("bundle-level: probe 18 against record 17.0.1 fatals", False,
+               "no exception")
+    except SystemExit as e:
+        expect("bundle-level: probe 18 against record 17.0.1 fatals",
+               "17.0.1" in str(e) and "18" in str(e), str(e))
+    # The at-line shape: unversioned name, non-Debian series, payload-probed
+    # upstream — must spell <upstream>~ce<series>-R and pass the order gate.
+    mini_at = {"packaged": [{"name": "gcc-at0-powerpc64",
+                             "family": "powerpc64-gcc", "series": "at0",
+                             "regime": "nodebian",
+                             "triplet": "powerpc64-linux-gnu", "version": "",
+                             "asset": "at0.tar.xz", "smoke": "fail",
+                             "served": True}],
+               "trunk_families": {}, "debian": {}}
+    mini_at_m = {"meta": {"repo": "r", "release": "rel"},
+                 "rows": {"at0.tar.xz": {
+                     "asset": "at0.tar.xz", "sha256": "0" * 64, "size": 1,
+                     "analysis": {"bin": ["powerpc64-unknown-linux-gnu-gcc"],
+                                  "gcc_targets": ["powerpc64-unknown-linux-gnu"],
+                                  "gcc_version": "8.2.1", "needed": [],
+                                  "has_binutils": True,
+                                  "root": {"strip": 1}}}}}
+    plans, _ = bundle_plans(mini_at, mini_at_m)
+    expect("at-line spells <upstream>~ce<series>-R and passes the order gate",
+           plans.get("gcc-at0-powerpc64", {}).get("version")
+           == "8.2.1~ceat0-1")
+
     # --- rendered maintscripts carry no placeholder, from template or value.
     # S3c passed the package name through a VALUE where .format() does not
     # re-scan, shipping /usr/bin/{name} literally on every tree self-link;
@@ -1475,8 +1704,20 @@ def selftest() -> int:
                f"{len(p17['links'])} links, {dict(classes)}")
         expect("gcc-17: 73 bin/ executables accounted for",
                len(p17["links"]) + 1 + len(p17["link_exclusions"]) == 73)
-    expect("the mirror gate leaves the pending remainder loud",
-           pending > 200, str(pending))
+    # --- pending gate: payloads without an analyzed manifest row are skipped
+    # and counted, never silently emitted. The completed mirror leaves pending
+    # at zero; dropping one row must move exactly its payload into the count.
+    expect("the completed mirror leaves zero pending", pending == 0,
+           str(pending))
+    victim = plans["gcc-16"]["payload"]["asset"]
+    rowless = {**manifest,
+               "rows": {k: v for k, v in manifest["rows"].items()
+                        if k != victim}}
+    reduced, reduced_pending = bundle_plans(catalog, rowless)
+    expect("a dropped row moves its payload into pending, loudly",
+           reduced_pending == pending + 1
+           and reduced["gcc-16"]["state"].startswith("pending"),
+           f"{pending} -> {reduced_pending}")
 
     print("selftest:", "clean" if rc == 0 else "FAILURES above")
     return rc
