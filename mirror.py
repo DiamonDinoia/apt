@@ -71,7 +71,7 @@ payload). Matching of family members and extraction of {date}/{major}
 goes through the family's OWN rename regex (named groups) — never a
 positional or end-anchored date guess: 6 of the 9 rename schemes put
 the triplet/arch after the date, where a date-anchored-at-end match
-finds nothing and crashes (attempt 1, defect A).A new date
+finds nothing and crashes (attempt 1, defect A). A new date
 re-records the row without alarm; dated assets beyond the newest two
 are pruned together with their manifest rows (404 on delete tolerated);
 rows naming assets an external pass already pruned (the mirror.sh-era
