@@ -409,6 +409,58 @@ def write_desktop(tree: Path, name: str, spec: dict, icon: str) -> None:
     )
 
 
+def render_scripts(name: str, spec: dict, info: dict, sha: str) -> dict:
+    """Render the postinst and prerm for one package. Separate from build() so
+    the selftest exercises the real render path offline: format() substitutes
+    the field values verbatim without re-scanning them, so a placeholder left
+    in a VALUE ships literally in the script (S3c shipped /usr/bin/{name} in
+    every tree self-link that way).
+    """
+    prefix = f"/opt/{name}"
+    links = spec.get("links", {})
+    fields = {
+        "url": info["url"],
+        "sha": sha,
+        "name": name,
+        # Upstream's executable does not always share the package name.
+        "bin": spec.get("binary", name),
+        "prefix": prefix,
+        "manifest": f"/var/lib/{name}.files",
+        "launchers": " ".join(spec.get("launcher", [])),
+        "unpack": unpack_command(spec, info["source"], '"$staging"'),
+        # A tree that ships a toolchain needs more than one command in PATH.
+        # Each target is checked in the staging tree before the rename, so a
+        # tool upstream dropped fails the install with the old tree untouched
+        # instead of leaving a dangling symlink.
+        "link_checks": "".join(
+            f'[ -x "$staging"/{target} ] || {{ echo "missing: {target}" >&2; exit 1; }}\n'
+            for target in links.values()),
+        # Links are created only over paths that are absent or already point
+        # into our own prefix: a path the distribution owns (a real file from
+        # a distro package, or its symlink) is left alone, because the defer
+        # regime means its owner wins any co-installation ordering. Without
+        # the guard, ln -sfn clobbers a distro split's tracked path when our
+        # postinst happens to run between the split's unpack and ours.
+        "links": (f'for pair in "/usr/bin/{name}|{prefix}/$launcher"'
+                  + "".join(f' "/usr/bin/{link}|{prefix}/{target}"'
+                            for link, target in links.items())
+                  + '\n'
+                  'do\n'
+                  '    p=${pair%%|*}; t=${pair#*|}\n'
+                  '    if [ -L "$p" ]; then\n'
+                  f'        case $(readlink "$p") in {prefix}/*) rm -f "$p";; *) continue;; esac\n'
+                  '    elif [ -e "$p" ]; then\n'
+                  '        echo "kept distribution-owned path $p" >&2\n'
+                  '        continue\n'
+                  '    fi\n'
+                  '    ln -sfn "$t" "$p"\n'
+                  'done\n'),
+        "link_names": " ".join(f"/usr/bin/{link}" for link in links),
+    }
+    return {script: table[spec["install"]].format(**fields)
+            for script, table in (("postinst", POSTINST), ("prerm", PRERM))}
+
+
 def build(name: str, spec: dict, info: dict, deb: Path) -> None:
     tree = OUT / f"{name}-tree"
     shutil.rmtree(tree, ignore_errors=True)
@@ -436,57 +488,16 @@ def build(name: str, spec: dict, info: dict, deb: Path) -> None:
                 capture_output=True, text=True, check=True,
             ).stdout.strip() or depends
 
-    prefix = f"/opt/{name}"
-    links = spec.get("links", {})
-    fields = {
-        "url": info["url"],
-        "sha": sha,
-        "name": name,
-        # Upstream's executable does not always share the package name.
-        "bin": spec.get("binary", name),
-        "prefix": prefix,
-        "manifest": f"/var/lib/{name}.files",
-        "launchers": " ".join(spec.get("launcher", [])),
-        "unpack": unpack_command(spec, info["source"], '"$staging"'),
-        # A tree that ships a toolchain needs more than one command in PATH.
-        # Each target is checked in the staging tree before the rename, so a
-        # tool upstream dropped fails the install with the old tree untouched
-        # instead of leaving a dangling symlink.
-        "link_checks": "".join(
-            f'[ -x "$staging"/{target} ] || {{ echo "missing: {target}" >&2; exit 1; }}\n'
-            for target in links.values()),
-        # Links are created only over paths that are absent or already point
-        # into our own prefix: a path the distribution owns (a real file from
-        # a distro package, or its symlink) is left alone, because the defer
-        # regime means its owner wins any co-installation ordering. Without
-        # the guard, ln -sfn clobbers a distro split's tracked path when our
-        # postinst happens to run between the split's unpack and ours.
-        "links": (f'for pair in "/usr/bin/{{name}}|{prefix}/$launcher"'
-                  + "".join(f' "/usr/bin/{link}|{prefix}/{target}"'
-                            for link, target in links.items())
-                  + '\n'
-                  'do\n'
-                  '    p=${pair%%|*}; t=${pair#*|}\n'
-                  '    if [ -L "$p" ]; then\n'
-                  f'        case $(readlink "$p") in {prefix}/*) rm -f "$p";; *) continue;; esac\n'
-                  '    elif [ -e "$p" ]; then\n'
-                  '        echo "kept distribution-owned path $p" >&2\n'
-                  '        continue\n'
-                  '    fi\n'
-                  '    ln -sfn "$t" "$p"\n'
-                  'done\n'),
-        "link_names": " ".join(f"/usr/bin/{link}" for link in links),
-    }
-    for script, table in (("postinst", POSTINST), ("prerm", PRERM)):
+    for script, text in render_scripts(name, spec, info, sha).items():
         path = control / script
-        path.write_text(table[spec["install"]].format(**fields))
+        path.write_text(text)
         path.chmod(0o755)
 
     if "desktop_name" in spec:
         # A tree install keeps the icon inside the payload under /opt. A member
         # install has nowhere to put one, so the spec names a stock icon.
         write_desktop(tree, name, spec,
-                      f"{prefix}/{spec['icon']}" if spec["install"] == "tree"
+                      f"/opt/{name}/{spec['icon']}" if spec["install"] == "tree"
                       else spec["icon"])
 
     unpacker = unpacker_dep(info["source"], spec["install"])
@@ -1357,8 +1368,9 @@ def resolved_spec(specs: dict, repos: dict) -> dict:
 
 def selftest() -> int:
     """Offline controls for the bundle rules. Every control is a real trip:
-    the denylist poison, the version-order gate, the soname table and the
-    gcc-17 28-linked / 45-excluded partition oracle from the README."""
+    the denylist poison, the version-order gate, the soname table, the
+    maintscript-render placeholder refusal and the gcc-17 28-linked /
+    45-excluded partition oracle from the README."""
     rc = 0
 
     def expect(name: str, cond: bool, detail: str = ""):
@@ -1426,6 +1438,22 @@ def selftest() -> int:
     expect("trunk form sorts below snapshots and true versions",
            dpkg_lt("17~trunk20260904", "17-20261001-1")
            and dpkg_lt("17~trunk20260904", "17.1.0-1"))
+
+    # --- rendered maintscripts carry no placeholder, from template or value.
+    # S3c passed the package name through a VALUE where .format() does not
+    # re-scan, shipping /usr/bin/{name} literally on every tree self-link;
+    # this refuses the class over the real render path, not the instance.
+    probe = render_scripts(
+        "probe", {"install": "tree", "launcher": ["bin/main"],
+                  "links": {"probe-tool": "bin/tool"}},
+        {"url": "https://invalid.invalid/payload.tar.xz",
+         "source": "payload.tar.xz"}, "0" * 64)
+    leftover = [f"{script}:{m.group(0)}" for script, text in probe.items()
+                for m in re.finditer(r"\{[a-z_]+\}", text)]
+    expect("rendered tree postinst/prerm contain no format placeholder",
+           leftover == [], str(leftover))
+    expect("tree self-link names /usr/bin/probe in postinst and prerm",
+           all("/usr/bin/probe" in text for text in probe.values()))
 
     # --- gcc-17 partition oracle: 28 linked + 45 excluded (27/15/1/2),
     # exactly the README's accounting
