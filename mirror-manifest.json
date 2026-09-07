@@ -14127,6 +14127,145 @@
       "sha256": "eb85fa50585672867cbdb5c7e25e84beb876e44f946a0eeccf07245a7b6bae6f",
       "size": 190896744
     },
+    "gcc-renovated-3.4.6.tar.xz": {
+      "analysis": {
+        "bin": [
+          "addr2line",
+          "c++filt",
+          "cpp",
+          "dwp",
+          "elfedit",
+          "gccbug",
+          "gcov",
+          "gp-archive",
+          "gp-collect-app",
+          "gp-display-html",
+          "gp-display-src",
+          "gp-display-text",
+          "gprof",
+          "gprofng",
+          "size",
+          "strings",
+          "x86_64-linux-gnu-g++",
+          "x86_64-linux-gnu-gcc"
+        ],
+        "bin_links": {
+          "ar": {
+            "target": "ar",
+            "type": "hardlink"
+          },
+          "as": {
+            "target": "as",
+            "type": "hardlink"
+          },
+          "c++": {
+            "target": "x86_64-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "g++": {
+            "target": "x86_64-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "gcc": {
+            "target": "x86_64-linux-gnu-gcc",
+            "type": "hardlink"
+          },
+          "ld": {
+            "target": "ld.bfd",
+            "type": "hardlink"
+          },
+          "ld.bfd": {
+            "target": "ld.bfd",
+            "type": "hardlink"
+          },
+          "ld.gold": {
+            "target": "ld.gold",
+            "type": "hardlink"
+          },
+          "nm": {
+            "target": "nm",
+            "type": "hardlink"
+          },
+          "objcopy": {
+            "target": "objcopy",
+            "type": "hardlink"
+          },
+          "objdump": {
+            "target": "objdump",
+            "type": "hardlink"
+          },
+          "ranlib": {
+            "target": "ranlib",
+            "type": "hardlink"
+          },
+          "readelf": {
+            "target": "readelf",
+            "type": "hardlink"
+          },
+          "strip": {
+            "target": "strip",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-c++": {
+            "target": "x86_64-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gcc-3.4.6": {
+            "target": "x86_64-linux-gnu-gcc",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [
+          "ar",
+          "as",
+          "ld"
+        ],
+        "clang_version": null,
+        "gcc_targets": [
+          "x86_64-linux-gnu"
+        ],
+        "gcc_version": "3.4.6",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": null,
+        "multilib": [
+          "lib64"
+        ],
+        "needed": [
+          "libc.so.6",
+          "libgcc_s.so.1",
+          "libstdc++.so.6"
+        ],
+        "root": {
+          "dot_prefix": true,
+          "nested": null,
+          "strip": 1,
+          "top": "gcc-renovated-3.4.6"
+        },
+        "target_arch": "x86-64",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "ld.gold",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 62
+      },
+      "asset": "gcc-renovated-3.4.6.tar.xz",
+      "etag": "\"9df33f62ddc0782bef9606ad74e8abea-14\"",
+      "key": "opt/gcc-renovated-3.4.6.tar.xz",
+      "kind": "stable",
+      "sha256": "460f343dbc7323591849a26e6144714f251255b539ee4e0f1e46300c84d44847",
+      "size": 114185208
+    },
     "gcc-renovated-4.0.4.tar.xz": {
       "analysis": {
         "bin": [
