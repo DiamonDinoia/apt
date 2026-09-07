@@ -57,19 +57,28 @@
 #                 libunwind chain; the payload's ompd gdb plugin needs
 #                 libpython3.10, which no baseline ships). This is build.py's
 #                 documented handover: "S4's ldd sweep classifies them".
+#                 "install_refusals": bundle -> {baselines, measured, reason,
+#                 signature, version} = the Breaks-window class: sid/trixie's
+#                 libstdc++6 Breaks gcc-4.3/4.4/4.5 below fixed revisions, the
+#                 defer spelling (E9) always sorts inside the window, and
+#                 libstdc++6 cannot be removed (apt Depends it), so these
+#                 bundles REFUSE to install by design. Asserted both
+#                 directions: the design row pins our version + the exact
+#                 Breaks clause in the apt output; an unexpected install or a
+#                 drifted refusal text both fail.
 #   Install-UX    one sid container with the built repo + real Debian
 #                 sources: per-name `apt-get -s install` legs for every
 #                 emitted regime debian name in the shard (rc 0; the candidate
 #                 is DEBIAN's whenever the live archive ships the name, ours
 #                 otherwise), a bare `apt-get -s install gcc-16` proving
 #                 DEBIAN's package wins the 100-pin (ours never shadows), and
-#                 the regime-3 abort of E21/E27: two same-family unversioned-
-#                 analog bundles under one pattern abort with apt's exact
-#                 text "Reached two conflicting assignments" while each name
-#                 alone resolves cleanly. No avr payload is mirrored today,
-#                 so the pair is SYNTHESIZED with the exact P/C/R shape
-#                 pcr_sets computes for the pending catalog entries (derived
-#                 from build.py, not paraphrased).
+#                 the regime-3 abort of E21/E27 on the mirrored floor itself:
+#                 a pattern over one unversioned-analog family's series aborts
+#                 with apt's exact text "Reached two conflicting assignments",
+#                 every family member named in the block carries our ~ce
+#                 version, and each name alone resolves cleanly. The
+#                 classifier control detaches OUR repo: no baseline ships the
+#                 family's spelling, so the same glob must fail differently.
 #   Class globs   'gcc-*' and 'clang-*' resolution with our repo attached,
 #                 plus a no-repo baseline capture for evidence. Our bundles
 #                 lawfully JOIN the glob solution set (gcc-17, clang-24,
@@ -89,13 +98,16 @@
 #                 jobs dirs missing out/ artifacts must come back as FAIL
 #                 rows with non-zero exit, no traceback, no forged E13
 #                 verdicts on absent evidence); the UX leg proves its own
-#                 abort classifier on the single-name and fixture-removed
-#                 arms; a stamps tripwire
-#                 (same shape as test_failure_modes.sh) refuses a run that
-#                 skipped a check class.
-#   Floor         8 bundles today (9 mirrored payloads; the two dated
-#                 gcc-trunk rows fold into one gcc-17 bundle). Concurrency 4;
-#                 containers --rm; everything scratch under one mktemp dir.
+#                 abort classifier on the single-name and repo-detached
+#                 arms; plan-reading loops carry an iterations==planned
+#                 assert so a body command eating the plan's stdin can never
+#                 silently skip rows (the S5 script(1) class); a stamps
+#                 tripwire (same shape as test_failure_modes.sh) refuses a
+#                 run that skipped a check class.
+#   Floor         the mirror is COMPLETE: every catalog payload is mirrored
+#                 (222 emit bundles, zero pending); --sweep asserts it.
+#                 Concurrency 4; containers --rm; everything scratch under
+#                 one mktemp dir.
 #
 # Usage: ./test_compilers.sh [--shard i/N] [--sweep] [--remeasure] [--baseline sid|trixie]
 #   --sweep      the CI full gate: fail unless the mirror covers EVERY
@@ -151,7 +163,7 @@ done
 # idiom).
 export GITHUB_TOKEN="${GITHUB_TOKEN:-$(command -v gh >/dev/null && gh auth token 2>/dev/null)}"
 
-mkdir -p "$tmp"/cfg "$tmp"/jobs "$tmp"/fixtures "$tmp"/ux
+mkdir -p "$tmp"/cfg "$tmp"/jobs "$tmp"/ux
 
 # ------------------------------------------------------------ selection
 #
@@ -220,6 +232,11 @@ if not selected:
         "catalog entries) — a shard is not allowed to prove nothing")
 
 cutoff = exceptions.get("cutoff", {})
+refusals = cutoff.get("install_refusals", {})
+bad = [n for n, r in refusals.items()
+       if n in emit and r.get("version") != emit[n]["version"]]
+if bad:
+    die(f"install_refusals rows tied to stale versions: {bad} — re-measure")
 policy = cutoff.get("clang_cutoff", {}).get("policy", "")
 m = (re.search(r"≤\s*([0-9.]+)", policy)
      or re.search(r"<=\s*([0-9.]+)", policy))
@@ -268,6 +285,7 @@ for n in sorted(selected):
            "expected_arch": arch.get(n) or arch.get(b["family"], ""),
            "target_emachine": emachine.get(b["payload"]["asset"]),
            "cutoff": limited(b),
+           "refusal_signature": refusals.get(n, {}).get("signature"),
            "ldd_recorded": cutoff.get("ldd", {}).get(n, {}).get("files", []),
            "asset": b["payload"]["asset"],
            "size_mib": b["payload"]["size_bytes"] >> 20}
@@ -283,6 +301,9 @@ with open(f"{tmp}/shard.tsv", "w") as f:
     for n in sorted(selected):
         f.write(f"{n}\n")
 open(f"{tmp}/ux/names.12", "w").write("\n".join(names12) + "\n")
+with open(f"{tmp}/ux/refusals.tsv", "w") as f:
+    for n in sorted(refusals):
+        f.write(f"{n}\t{refusals[n]['signature']}\n")
 if names12:
     print(f"==> install-UX names (regime debian, this shard): "
           f"{len(names12)}")
@@ -366,67 +387,40 @@ python3 "$root/compilers_verdict.py" --selftest ||
   { echo "FAIL  collector selftest"; exit 1; }
 stamp collector_selftest
 
-# Regime-3 fixture (E21/E27): two pending unversioned-analog bundles
-# synthesized with the exact P/C/R pcr_sets computes for them.
+# Regime-3 leg inputs (E21/E27): the mirrored unversioned-analog families
+# carry the designed shape directly — no fixture. Pick the family with the
+# most emit members (deterministically), hand its name list and glob to the
+# install-UX container; the abort assertion there runs against the SAME debs
+# the production repo serves.
 python3 - "$root" "$tmp" <<'PYFIX'
 import json
-import os
-import shutil
 import subprocess
 import sys
 
 root, tmp = sys.argv[1:3]
-sys.path.insert(0, root)
-import build
-
-catalog = json.load(open(f"{root}/catalog.json"))
-inv = build.inventory_names(catalog)
 spec = json.loads(subprocess.run([sys.executable, f"{root}/build.py",
                                   "--dump-spec"], capture_output=True,
-                                 text=True, check=True).stdout)
-pend = sorted(n for n, b in spec["bundles"].items()
-              if b.get("state") != "emit"
-              and b.get("regime") == "unversioned"
-              and " (trunk family)" not in n)
-assert len(pend) >= 2, "regime-3 fixture needs two pending unversioned names"
-fam = lambda n: n.rsplit("-", 1)[1]
-one = pend[0]
-pair = [one, next(n for n in pend[1:] if fam(n) == fam(one))]
-
-fx = f"{tmp}/fixtures"
-os.makedirs(f"{fx}/w", exist_ok=True)
-for name in pair:
-    e = next(e for e in catalog["packaged"] if e["name"] == name)
-    pcr = build.pcr_sets(name, series=e["series"], regime=e["regime"],
-                         triplet=e["triplet"], cross=False,
-                         upstream=e["version"], inventory=inv)
-    d = f"{fx}/w/{name}"
-    os.makedirs(f"{d}/DEBIAN", exist_ok=True)
-    ctl = (f"Package: {name}\nVersion: {e['series']}~fx1\n"
-           "Architecture: amd64\nMaintainer: regime-3 probe <t@invalid>\n"
-           f"Description: regime-3 unversioned-analog probe ({name})\n")
-    for deb, ours in (("Provides", "provides"), ("Conflicts", "conflicts"),
-                      ("Replaces", "replaces")):
-        vals = pcr[ours]
-        if ours == "provides":
-            vals = [f"{n} ({c})" for n, c in vals.items()]
-        if vals:
-            ctl += f"{deb}: {', '.join(vals)}\n"
-    open(f"{d}/DEBIAN/control", "w").write(ctl)
-    subprocess.run(["dpkg-deb", "--root-owner-group", "--build", d,
-                    f"{fx}/{name}_{e['series']}.fx1_amd64.deb"],
-                   check=True, capture_output=True)
-shutil.rmtree(f"{fx}/w")
-subprocess.run("dpkg-scanpackages --multiversion . /dev/null > Packages"
-               " 2>/dev/null && gzip -kf Packages",
-               shell=True, cwd=fx, check=True)
-glob = f"gcc-*-{fam(pair[0])}"
-with open(f"{tmp}/ux/regime3.env", "w") as f:
-    f.write(f"R3NAME1={pair[0]}\nR3NAME2={pair[1]}\nR3GLOB={glob}\n")
-print(f"ok    regime-3 fixture: {pair[0]} + {pair[1]} (pcr_sets-derived), "
-      f"glob '{glob}'")
+                                  text=True, check=True).stdout)
+groups = {}
+for n, b in spec["bundles"].items():
+    if b.get("state") == "emit" and b.get("regime") == "unversioned":
+        groups.setdefault(n.rsplit("-", 1)[1], []).append(n)
+fams = sorted(groups, key=lambda f: (-len(groups[f]), f))
+assert fams and len(groups[fams[0]]) >= 2, \
+    "regime-3 leg needs a mirrored unversioned family with >=2 series"
+fam = fams[0]
+names = sorted(groups[fam])
+assert all(n.startswith("gcc-") for n in names), \
+    f"the '{fam}' unversioned family left the gcc- naming regime: {names}"
+with open(f"{tmp}/ux/names.r3", "w") as f:
+    for n in names:
+        f.write(n + "\n")
+with open(f"{tmp}/ux/r3.env", "w") as f:
+    f.write(f"R3FAM={fam}\nR3GLOB=gcc-*-{fam}\n")
+print(f"ok    regime-3 leg: {len(names)} mirrored {fam} bundles "
+      f"({names[0]} .. {names[-1]}), glob 'gcc-*-{fam}'")
 PYFIX
-stamp regime3_fixture
+stamp regime3_leg
 
 # ------------------------------------------------------ container scripts
 #
@@ -454,9 +448,23 @@ apt-get update -qq -o APT::Update::Error-Mode=any ||
 
 if apt-get install -y --no-install-recommends "$PKG=$VERSION" \
     >"$out/install.log" 2>&1; then
+  if [ -f "$cfg/refusal" ]; then
+    fail "install $PKG=$VERSION unexpectedly SUCCEEDED — the recorded Breaks-window refusal row is stale (re-measure exceptions.json cutoff.install_refusals)"
+    echo "$rc" > "$out/rc"; exit 1
+  fi
   note "ok    install $PKG=$VERSION from the built repo"
 else
-  fail "install $PKG=$VERSION: $(tail -n 2 "$out/install.log" | head -n 1)"
+  if [ -f "$cfg/refusal" ]; then
+    sig=$(cat "$cfg/refusal")
+    if grep -qF "$sig" "$out/install.log" &&
+       grep -qF "$VERSION" "$out/install.log"; then
+      note "ok    designed refusal: $PKG=$VERSION refused with '$sig' (E13: both directions asserted)"
+      echo "$rc" > "$out/rc"; exit 0
+    fi
+    fail "install $PKG=$VERSION refused WITHOUT the recorded signature '$sig' — the refusal text drifted (re-measure)"
+  else
+    fail "install $PKG=$VERSION: $(tail -n 2 "$out/install.log" | head -n 1)"
+  fi
   echo "$rc" > "$out/rc"; exit 1
 fi
 st=$(dpkg-query -W -f '${Status}' "$PKG" 2>/dev/null || true)
@@ -482,34 +490,55 @@ linked=0
 # so readlink -f resolves past the dump-spec target: assert the resolution
 # lands INSIDE the prefix, is executable, and runs — never the intermediate
 # spelling (test_install.sh's "resolves to something runnable" semantics).
-while IFS=$'\t' read -r link target; do
+# The plan file rides fd 9 and every body command gets dead stdin: with the
+# plan on fd 0 (the old shape), a payload binary that reads stdin eats the
+# remaining rows and the loop silently skips every later link (S5's
+# script(1) class). iter==planned is the assert that turns the skip loud.
+planned=$(wc -l < "$cfg/links.tsv")
+iter=0
+while IFS=$'\t' read -r -u 9 link target; do
+  iter=$((iter + 1))
   t=$(readlink -f "/usr/bin/$link" 2>/dev/null || true)
   case $t in
     "$PREFIX/"*) ;;
     *) fail "link /usr/bin/$link -> $t, not into $PREFIX"; continue ;;
   esac
   [ -x "$t" ] || { fail "link target $t not executable"; continue; }
-  "$link" --version >"$out/link.$link.version" 2>&1 ||
+  "$link" --version </dev/null >"$out/link.$link.version" 2>&1 ||
     { fail "link $link is on PATH but --version exits rc=$?"; continue; }
   linked=$((linked + 1))
-done < "$cfg/links.tsv"
-note "ok    launcher + $linked links resolve into $PREFIX and run"
+done 9< "$cfg/links.tsv"
+[ "$iter" -eq "$planned" ] ||
+  fail "link loop visited $iter of $planned rows — a body command ate the plan"
+note "ok    launcher + $linked/$planned links resolve into $PREFIX and run"
 du -sh "$PREFIX" | awk '{print "ok    payload on disk: " $1}' >> "$out/report"
 
 # bin/ accounting and ldd sweep inputs; both are compared host-side, where
-# the comparators sit next to their controls.
+# the comparators sit next to their controls. The sweep's process-substitution
+# input keeps the loop in THIS shell (a pipeline's subshell would swallow the
+# seen counter); ldd gets dead stdin so it can never eat the find stream,
+# and seen==total makes any such truncation loud instead of silent.
 (cd "$PREFIX/bin" && find . -maxdepth 1 -mindepth 1 \( -type f -o -type l \) \
    -printf '%f\n') | sort > "$out/bin.present"
-find "$PREFIX" -type f \( -perm -u+x -o -name '*.so*' \) -print0 |
+total=$(find "$PREFIX" -type f \( -perm -u+x -o -name '*.so*' \) -printf 'x' |
+        wc -c)
+seen=0
 while IFS= read -r -d '' f; do
-  r=$(ldd "$f" 2>/dev/null) || r=
+  seen=$((seen + 1))
+  r=$(ldd "$f" </dev/null 2>/dev/null) || r=
   printf '%s\n' "$r" |
     awk -v f="${f#"$PREFIX"/}" '/not found/{ print f "\t" $1 }'
-done | sort > "$out/ldd.pairs"
+done < <(find "$PREFIX" -type f \( -perm -u+x -o -name '*.so*' \) -print0) \
+  > "$out/.ldd.raw"
+sort -o "$out/ldd.pairs" "$out/.ldd.raw"
+rm -f "$out/.ldd.raw"
+[ "$seen" -eq "$total" ] ||
+  fail "ldd sweep covered $seen of $total payload paths — loop input eaten"
 
 cat > /tmp/hello.c <<'C'
 #include <stdio.h>
-int main(void) { int s = 0; for (int i = 1; i <= 100; ++i) s += i;
+/* C89-safe on purpose: era gcc defaults to gnu89, so no C99 declarations. */
+int main(void) { int s = 0; int i; for (i = 1; i <= 100; ++i) s += i;
                  printf("s4-c-%d\n", s); return 0; }
 C
 cat > /tmp/hello.cpp <<'CPP'
@@ -632,7 +661,14 @@ else
       objd=$(cat "$cfg/payload_objdump")
       "$PREFIX/bin/$reelf" -h /tmp/o.o > "$out/arch.readelf" 2>&1 ||
         fail "payload readelf ($reelf) refused the object"
-      em=$(od -An -j 18 -N 2 -tu1 /tmp/o.o | awk '{print $1 + 256 * $2}')
+      # e_machine honors the object's OWN endianness (EI_DATA at offset 5):
+      # a big-endian cross object (m68k, ppc, sparc64, hppa, s390x) decodes
+      # byte-swapped -> 4 reads as 1024 and the numeric gate false-fires.
+      if [ "$(od -An -j 5 -N 1 -tu1 /tmp/o.o | awk '{print $1}')" = 2 ]; then
+        em=$(od -An -j 18 -N 2 -tu1 /tmp/o.o | awk '{print $1 * 256 + $2}')
+      else
+        em=$(od -An -j 18 -N 2 -tu1 /tmp/o.o | awk '{print $1 + 256 * $2}')
+      fi
       echo "emachine=$em" >> "$out/arch.readelf"
       "$PREFIX/bin/$objd" -f /tmp/o.o > "$out/arch.objdump" 2>&1 ||
         fail "payload objdump ($objd) refused the object"
@@ -675,11 +711,36 @@ apt-get update -qq || fail "update with our repo"
 # whenever a 500-priority source (the live sid archive, or apt.llvm.org which
 # the bootstrap adds) ships the name, the candidate must be THEIRS (ours sit
 # at 100 below 500; never shadowing is the defer contract, E4 included).
-while IFS= read -r n; do
+# fd 9 carries the plan; body commands get dead stdin (an apt-mode change
+# that starts reading fd 0 must trip the count assert, never skip names).
+planned=$(wc -l < /out/names.12)
+iter=0
+while IFS= read -r -u 9 n; do
+  iter=$((iter + 1))
   [ -n "$n" ] || continue
-  apt-get -s install "$n" > "$out/leg.$n" 2>&1 ||
-    { fail "apt-get -s install $n: rc=$?"; continue; }
-  pol=$(apt-cache policy "$n")
+  if ! apt-get -s install "$n" </dev/null > "$out/leg.$n" 2>&1; then
+    sig=$(grep "^$n	" /out/refusals.tsv | cut -f2-)
+    if [ -n "$sig" ]; then
+      grep -qF "$sig" "$out/leg.$n" ||
+        { fail "bare-name $n refused WITHOUT the recorded signature '$sig'"
+          continue; }
+      note "ok    designed refusal: bare-name $n refuses with '$sig'"
+      continue
+    fi
+    # Not ours: the defer candidate is the archive's, and the archive's own
+    # package may be uninstallable today (e.g. llvm.org's clang-21/22/24 on
+    # trixie want a libstdc++-NN-dev trixie lacks). The assertable property:
+    # OUR versions never appear as a failure party.
+    grep -qE '~(ce|trunk)' "$out/leg.$n" &&
+      { fail "bare-name $n unresolved and OUR version appears in the failure"
+        continue; }
+    note "ok    defer-under-broken-archive: $n fails inside the archive's own candidate"
+    continue
+  elif grep -q "^$n	" /out/refusals.tsv; then
+    fail "bare-name $n unexpectedly RESOLVES — the recorded refusal row is stale"
+    continue
+  fi
+  pol=$(apt-cache policy "$n" </dev/null)
   cand=$(sed -n 's/^ *Candidate: //p' <<<"$pol")
   if [ -z "$cand" ] || [ "$cand" = "(none)" ]; then
     fail "$n: no candidate with our repo attached"; continue
@@ -699,7 +760,9 @@ while IFS= read -r n; do
       *) fail "$n: candidate $cand is neither ours nor the archive's" ;;
     esac
   fi
-done < /out/names.12
+done 9< /out/names.12
+[ "$iter" -eq "$planned" ] ||
+  fail "per-name UX legs visited $iter of $planned names — plan input eaten"
 
 s=$(apt-get -s install gcc-16 2>&1) || fail "apt-get -s install gcc-16 rc=$?"
 inst=$(sed -n 's/^Inst gcc-16 //p' <<<"$s")
@@ -714,8 +777,8 @@ esac
 # with and without our repo. The property that survives: no conflicting
 # assignment apt reports may involve OUR packages — every one either carries
 # a ~ce/~trunk version or is a name only our repo offers. A glob that makes a
-# bundle of ours conflict is the E21 defect class, and the regime-3 fixture
-# below proves the abort classifier on the controlled instance.
+# bundle of ours conflict is the E21 defect class, and the regime-3 legs
+# below prove the abort classifier on the mirrored unversioned family.
 apt-get -s install 'gcc-*'   > "$out/glob.gcc.ours"   2>&1 || true
 apt-get -s install 'clang-*' > "$out/glob.clang.ours" 2>&1 || true
 # apt prints conflicting assignments as `name:amd64=version is selected for
@@ -735,35 +798,53 @@ for g in gcc clang; do
   note "ok    $g-* glob: conflict block is Debian's own; no ~ce/~trunk assignment in it"
 done
 
-# Regime-3 (E21/E27): the synthesized unversioned-analog pair.
-. /out/regime3.env
-echo 'deb [trusted=yes] file:///fixtures ./' > /etc/apt/sources.list.d/r3.list
-apt-get update -qq || fail "update with the fixture repo"
-for one in "$R3NAME1" "$R3NAME2"; do
-  s=$(apt-get -s install "$one" 2>&1) ||
+# Regime-3 (E21/E27): the mirrored unversioned-analog family itself. Each
+# name resolves alone; the class glob across the family's series aborts with
+# apt's exact "Reached two conflicting assignments" text, and every family
+# member named in the abort block must carry OUR ~ce version (the bundles
+# ARE the conflict parties — the designed E21 outcome; only this targeted
+# glob may show ~ce assignments, never the wide class globs above).
+. /out/r3.env
+r3planned=$(wc -l < /out/names.r3)
+r3iter=0
+while IFS= read -r -u 9 one; do
+  r3iter=$((r3iter + 1))
+  s=$(apt-get -s install "$one" </dev/null 2>&1) ||
     { fail "regime-3 control: single name $one does not resolve"; continue; }
   grep -q "^Inst $one " <<<"$s" ||
     fail "regime-3 control: $one not in the solution"
-done
-note "ok    regime-3 control: each fixture name resolves alone"
+done 9< /out/names.r3
+[ "$r3iter" -eq "$r3planned" ] ||
+  fail "regime-3 single-name legs visited $r3iter of $r3planned names"
+note "ok    regime-3: each of the $r3planned mirrored $R3FAM names resolves alone"
 rc3=0
-s=$(apt-get -s install "$R3GLOB" 2>&1) || rc3=$?
-if [ "$rc3" -ne 100 ] ||
-   ! grep -q 'Reached two conflicting assignments' <<<"$s" ||
-   ! grep -q "$R3NAME1" <<<"$s" || ! grep -q "$R3NAME2" <<<"$s"; then
-  fail "regime-3 glob '$R3GLOB': rc=$rc3, abort text or fixture names missing"
+s=$(apt-get -s install "$R3GLOB" </dev/null 2>&1) || rc3=$?
+echo "$s" > "$out/r3.glob"
+block=$(sed -n '/Reached two conflicting assignments/,$p' <<<"$s")
+if [ "$rc3" -ne 100 ] || [ -z "$block" ]; then
+  fail "regime-3 glob '$R3GLOB': rc=$rc3, abort text missing"
 else
-  note "ok    regime-3 glob '$R3GLOB' aborts: two conflicting assignments naming both bundles (E21/E27)"
+  named=0
+  while IFS= read -r -u 9 one; do
+    grep -q "$one" <<<"$block" || continue
+    grep -Eq "$one:amd64=[^ ]*~ce" <<<"$block" ||
+      { fail "regime-3 block names $one without our ~ce version"; continue; }
+    named=$((named + 1))
+  done 9< /out/names.r3
+  [ "$named" -ge 2 ] ||
+    fail "regime-3 block names $named family members with ~ce versions (<2)"
+  note "ok    regime-3 glob '$R3GLOB' aborts: $named family members in two conflicting assignments, all ~ce (E21/E27)"
 fi
-# Classifier control: without the fixture repo the same glob must fail for a
-# DIFFERENT reason (nothing found), not with the conflict abort.
-rm /etc/apt/sources.list.d/r3.list
+# Classifier control: with OUR repo detached the glob matches nothing (no
+# baseline ships a gcc-*-<family> spelling), so the same glob must fail for
+# a DIFFERENT reason — the conflict-abort text must be absent.
+rm /etc/apt/sources.list.d/diamondinoia.sources
 apt-get update -qq
 rc4=0
-s=$(apt-get -s install "$R3GLOB" 2>&1) || rc4=$?
+s=$(apt-get -s install "$R3GLOB" </dev/null 2>&1) || rc4=$?
 grep -q 'Reached two conflicting assignments' <<<"$s" &&
-  fail "classifier control: the abort persists without the fixture repo"
-note "ok    classifier control: the glob without the pair fails differently (rc=$rc4)"
+  fail "classifier control: the abort persists without our repo"
+note "ok    classifier control: the glob without our bundles fails differently (rc=$rc4)"
 echo "$rc" > "$out/rc"
 exit "$rc"
 UXEOS
@@ -823,6 +904,8 @@ with open(f"{d}/env", "w") as f:
         f.write(f"{k}={v}\n")
 if cxx:
     open(f"{d}/cxx", "w").write(cxx)
+if cfg["refusal_signature"]:
+    open(f"{d}/refusal", "w").write(cfg["refusal_signature"])
 
 if not native:
     def bt(tool):
@@ -845,6 +928,7 @@ meta = {"expect": expect,
         "target_emachine": cfg["target_emachine"],
         "smoke": cfg["smoke"], "level": level, "cutoff": cfg["cutoff"],
         "regime": cfg["regime"], "native": native,
+        "install_refusal": cfg["refusal_signature"],
         "version": cfg["version"], "size_mib": cfg["size_mib"]}
 json.dump(meta, open(f"{tmp}/jobs/{b}.{base}/expect.json", "w"), indent=1)
 PYREN
@@ -866,10 +950,10 @@ job() { # $1 bundle $2 baseline
 
 ux_job() {
   local d=$tmp/ux
+  mkdir -p "$d"
   echo "==> job install-UX/sid"
   "$engine" run --rm -i \
     -v "$repo:/repo:ro" \
-    -v "$tmp/fixtures:/fixtures:ro" \
     -v "$d:/out" \
     debian:sid bash -o pipefail -s < "$tmp/ux.sh" \
     > "$d/container.log" 2>&1
@@ -896,7 +980,7 @@ python3 "$root/compilers_verdict.py" "$root" "$tmp"
 
 # Tripwire: a run that silently skipped a check class must not pass.
 missing=$(comm -13 <(sort "$tmp/stamps") \
-  <(printf '%s\n' digests slice comparators collector_selftest regime3_fixture jobs_ran | sort))
+  <(printf '%s\n' digests slice comparators collector_selftest regime3_leg jobs_ran | sort))
 [ -z "$missing" ] || { echo "FAIL  check classes did not run: $missing"; exit 1; }
 
 echo "==> all compiler-matrix classes green ($(wc -l < "$tmp/stamps") stamps)"

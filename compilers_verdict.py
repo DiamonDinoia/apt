@@ -20,6 +20,10 @@ ldd.pairs,bin.present}) and:
     "unexpectedly resolved" rows on payloads that never installed). A job
     claiming rc=0 with no FAIL lines but without sweep evidence is a harness
     hole and fails just as hard,
+  - lets expect.json's install_refusal rows report "ok(refused)": the
+    designed outcome IS apt's refusal (the Breaks-window class), so no
+    payload and no sweep artifacts exist; the job must carry the
+    designed-refusal line — a refusal verdict without evidence fails,
   - for every bundle with recorded cutoff.ldd rows, prints the CURRENT
     measured unresolved (basename, soname) set per baseline, so an
     exceptions.json update is backed by the run transcript itself,
@@ -98,6 +102,20 @@ def collect_jobs(tmp, names, bases, emit=print):
             for line in report:
                 if line.startswith("FAIL"):
                     fails.append(f"{name}/{base}: {line}")
+
+            # Recorded install-refusal rows: the designed outcome IS the apt
+            # refusal (the Breaks-window class), so no payload ever lands and
+            # the sweep artifacts are absent by design. The job writes its
+            # designed-refusal line and rc=0 only when the refusal matched
+            # the recorded signature; anything else already FAILs above.
+            if meta.get("install_refusal"):
+                if not primary and not any(
+                        "designed refusal" in l for l in report):
+                    fail(f"{name}/{base}: a refusal row is recorded but the "
+                         "job left no designed-refusal evidence")
+                matrix.append((name, base,
+                               "ok(refused)" if not primary else "FAIL"))
+                continue
 
             # The sweep artifacts gate the both-directions comparisons: they
             # are the ONLY evidence either direction can stand on. A job that
@@ -418,6 +436,53 @@ def selftest() -> int:
         check(r.returncode != 0 and "unexpectedly resolved" in r.stdout
               and "Traceback" not in r.stderr,
               "E13 resolve assertion still fires when the sweep DID run")
+
+    # Arm 6 (install-refusal rows): a recorded refusal job PASSES with its
+    # designed-refusal line and rc 0 — no sweep artifacts exist by design.
+    with tempfile.TemporaryDirectory() as t:
+        meta = _synthetic_meta()
+        meta["install_refusal"] = "libstdc++6 : Breaks: gcc-4.4 (< 4.4.6-4)"
+        d = _write_job(t, "gcc-4.4", "sid", meta)
+        os.makedirs(f"{d}/out")
+        open(f"{d}/out/report", "w").write(
+            "ok    designed refusal: gcc-4.4=4.4~ce4.4.7-1 refused\n")
+        open(f"{d}/out/rc", "w").write("0")
+        open(f"{t}/shard.tsv", "w").write("gcc-4.4\n")
+        open(f"{t}/bases", "w").write("sid\n")
+        r = _collect_status(t)
+        check(r.returncode == 0 and "ok(refused)" in r.stdout
+              and "missing" not in r.stdout,
+              "designed refusal passes without sweep artifacts")
+
+    # Arm 7: refusal meta, rc 0, but no designed-refusal evidence — a claimed
+    # pass without evidence is not a pass.
+    with tempfile.TemporaryDirectory() as t:
+        meta = _synthetic_meta()
+        meta["install_refusal"] = "libstdc++6 : Breaks: gcc-4.4 (< 4.4.6-4)"
+        d = _write_job(t, "gcc-4.4", "sid", meta)
+        os.makedirs(f"{d}/out")
+        open(f"{d}/out/report", "w").write("ok    nothing asserted\n")
+        open(f"{d}/out/rc", "w").write("0")
+        open(f"{t}/shard.tsv", "w").write("gcc-4.4\n")
+        open(f"{t}/bases", "w").write("sid\n")
+        r = _collect_status(t)
+        check(r.returncode != 0 and "no designed-refusal evidence" in r.stdout,
+              "refusal row without evidence fails")
+
+    # Arm 8: refusal job with a primary FAIL (drifted signature) stays red.
+    with tempfile.TemporaryDirectory() as t:
+        meta = _synthetic_meta()
+        meta["install_refusal"] = "libstdc++6 : Breaks: gcc-4.4 (< 4.4.6-4)"
+        d = _write_job(t, "gcc-4.4", "sid", meta)
+        os.makedirs(f"{d}/out")
+        open(f"{d}/out/report", "w").write(
+            "FAIL  install gcc-4.4 refused WITHOUT the recorded signature\n")
+        open(f"{d}/out/rc", "w").write("1")
+        open(f"{t}/shard.tsv", "w").write("gcc-4.4\n")
+        open(f"{t}/bases", "w").write("sid\n")
+        r = _collect_status(t)
+        check(r.returncode != 0 and "ok(refused)" not in r.stdout,
+              "refusal job with a primary failure stays red")
 
     print("collector selftest:", "clean" if rc == 0 else "FAILURES above")
     return rc

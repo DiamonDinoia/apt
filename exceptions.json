@@ -5,6 +5,28 @@
       "policy": "clang series \u22643.9 \u2192 L1",
       "result": "3.3: plain C link fails ('cannot find crtbegin.o': the driver predates multiversion GCC discovery; --gcc-toolchain is unrecognized); C with -B/-L /usr/lib/gcc/x86_64-linux-gnu/16 compiles and runs (s4-c-5050); C++ fails on libstdc++-16-dev headers (/usr/include/c++/16/bits/stl_function.h:442:10: error: use of undeclared identifier '__UINTPTR_TYPE__')"
     },
+    "install_refusals": {
+      "gcc-4.4": {
+        "baselines": [
+          "sid",
+          "trixie"
+        ],
+        "measured": "2026-09-07",
+        "reason": "Debian's libstdc++6 on today's sid AND trixie declares 'Breaks: Breaks: gcc-4.4 (< 4.4.6-4)'; the defer spelling 4.4~ce4.4.7-1 sorts below every Debian spelling of the series (E9), so it always sits inside the window, and libstdc++6 cannot be removed (apt Depends it). Installing by name=version therefore refuses on both baselines by design; the suite asserts the refusal with this exact signature in both directions (a future base-image or archive change that lets it install fails the run). Measured by an apt -s census over all 163 regime-debian emit names: the refusal set is exactly {gcc-4.4, gcc-4.5}.",
+        "signature": "libstdc++6 : Breaks: gcc-4.4 (< 4.4.6-4)",
+        "version": "4.4~ce4.4.7-1"
+      },
+      "gcc-4.5": {
+        "baselines": [
+          "sid",
+          "trixie"
+        ],
+        "measured": "2026-09-07",
+        "reason": "Debian's libstdc++6 on today's sid AND trixie declares 'Breaks: Breaks: gcc-4.5 (< 4.5.3-2)'; the defer spelling 4.5~ce4.5.3-1 sorts below every Debian spelling of the series (E9), so it always sits inside the window, and libstdc++6 cannot be removed (apt Depends it). Installing by name=version therefore refuses on both baselines by design; the suite asserts the refusal with this exact signature in both directions (a future base-image or archive change that lets it install fails the run). Measured by an apt -s census over all 163 regime-debian emit names: the refusal set is exactly {gcc-4.4, gcc-4.5}.",
+        "signature": "libstdc++6 : Breaks: gcc-4.5 (< 4.5.3-2)",
+        "version": "4.5~ce4.5.3-1"
+      }
+    },
     "ldd": {
       "clang-24": {
         "files": [

@@ -119,7 +119,10 @@ jobs:
       - name: Run the shard
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./test_compilers.sh --shard "${{ matrix.shard }}" --baseline "${{ matrix.baseline }}"
+        # --sweep is the full-gate assertion: with the mirror complete it
+        # passes vacuously; any payload dropping out of the mirror turns
+        # every cell red instead of silently shrinking the floor.
+        run: ./test_compilers.sh --shard "${{ matrix.shard }}" --baseline "${{ matrix.baseline }}" --sweep
 
   # The non-vacuity rule, proven against the live shard space: a slot that
   # resolves zero mirrored bundles must exit 1 with nothing tested.
