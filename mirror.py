@@ -71,9 +71,12 @@ payload). Matching of family members and extraction of {date}/{major}
 goes through the family's OWN rename regex (named groups) — never a
 positional or end-anchored date guess: 6 of the 9 rename schemes put
 the triplet/arch after the date, where a date-anchored-at-end match
-finds nothing and crashes (attempt 1, defect A). A new date
+finds nothing and crashes (attempt 1, defect A).A new date
 re-records the row without alarm; dated assets beyond the newest two
 are pruned together with their manifest rows (404 on delete tolerated);
+rows naming assets an external pass already pruned (the mirror.sh-era
+nightly keeps its own window on main) are reaped the same way at the
+family pass — rotation never alarms, stables never reap;
 undated `<family>-<8digits>.tar.xz` assets on the release are
 pre-rename leftovers and are dropped (mirror.sh precedent). The
 keep-two accounting spans the whole renamed namespace of a family:
@@ -593,6 +596,25 @@ def prune_plan(dated_assets: list[str], rx: re.Pattern,
     return dated[: max(0, len(dated) - keep)]
 
 
+def reap_orphaned_trunk_rows(rows: dict, fam: str, uploaded: dict) -> list[str]:
+    """Drop one nightly family's rows whose asset already left the release.
+
+    Keep-two pruning deletes the oldest dated asset together with its
+    rows, but only when THIS process does the pruning. When another pass
+    pruned first (the mirror.sh-era nightly on main still slides its own
+    window, or an interrupted run died between the delete and its manifest
+    commit), this copy's rows still name the gone assets and nothing else
+    reaps them: check would alarm rc 1 on them forever. For the nightly
+    class a vanished asset is expected rotation — re-record by dropping
+    the row, without alarm. Stables are untouchable: a stable row carries
+    no family, never reaps, and its vanished asset stays drift."""
+    gone = sorted(rk for rk, r in rows.items()
+                  if r.get("family") == fam and r["asset"] not in uploaded)
+    for rk in gone:
+        del rows[rk]
+    return gone
+
+
 # --------------------------------------------------------- verification
 
 def verify_rows(rows: dict, uploaded: dict[str, dict], head=None) -> list[str]:
@@ -838,6 +860,11 @@ def cmd_sync(max_downloads: int | None, selectors: list[str]) -> int:
         b = key[len(PREFIX):]
 
         fam_dated_assets = sorted(n for n in uploaded if rx.match(n))
+
+        for rk in reap_orphaned_trunk_rows(rows, fam, uploaded):
+            print(f"{fam}: reaped {rk}: its asset was already rotated off "
+                  "the release (nightly class re-records without alarm)")
+            save_manifest(manifest)
 
         # Rows for row-less assets already on the release: legacy adopt for
         # the two mirror.sh-era names, re-download-verify for anything else.
@@ -1261,6 +1288,36 @@ def cmd_selftest() -> int:
     expect("pending + --complete -> 2", check_decision([], ["x"], True) == 2)
     expect("problems -> 1", check_decision(["p"], [], False) == 1)
     expect("problems beat pending", check_decision(["p"], ["x"], True) == 1)
+
+    # ---------------- reap of externally-rotated nightly rows
+    # Live class observed 2026-09-07: the mirror.sh-era nightly on main
+    # pruned gcc-17-trunk20260904/0905 off the release while the branch
+    # manifest still recorded them — a permanent rc 1 until reaped here.
+    up = {"gcc-17-trunk20260907.tar.xz": {}}
+    rows_reap = {
+        "gcc-trunk-20260904.tar.xz": {"asset": "gone-trunk",
+                                      "family": "gcc-trunk", "kind": "trunk"},
+        "gcc-trunk-20260907.tar.xz": {"asset": "gcc-17-trunk20260907.tar.xz",
+                                      "family": "gcc-trunk", "kind": "trunk"},
+        "clang-trunk-20260904.tar.xz": {"asset": "gone-legacy",
+                                        "family": "clang-trunk",
+                                        "kind": "legacy"},
+        "gcc-16.2.0.tar.xz": {"asset": "gone-stable", "kind": "stable"},
+    }
+    got = reap_orphaned_trunk_rows(rows_reap, "gcc-trunk", up)
+    expect("reap drops this family's gone rows only",
+           got == ["gcc-trunk-20260904.tar.xz"]
+           and sorted(rows_reap) == ["clang-trunk-20260904.tar.xz",
+                                     "gcc-16.2.0.tar.xz",
+                                     "gcc-trunk-20260907.tar.xz"], str(got))
+    got2 = reap_orphaned_trunk_rows(rows_reap, "clang-trunk", up)
+    expect("legacy rows reap too; the stable row is untouchable",
+           got2 == ["clang-trunk-20260904.tar.xz"]
+           and sorted(rows_reap) == ["gcc-16.2.0.tar.xz",
+                                     "gcc-trunk-20260907.tar.xz"], str(got2))
+    expect("nothing left to reap is a no-op",
+           reap_orphaned_trunk_rows(rows_reap, "gcc-trunk", up) == []
+           and "gcc-16.2.0.tar.xz" in rows_reap)
 
     # ---------------- prune keep-two over EVERY family's rename scheme
     # (defect A control: date and major always come out of the family's own
