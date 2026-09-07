@@ -613,10 +613,51 @@ set -euo pipefail
 prep
 
 echo "== LEG A: distro resolution against the live archive"
+# An archive-absent name can still be refused by the solver: an INSTALLED
+# archive package (libstdc++6 today) carries a versioned Breaks against the
+# name, and every defer-conformant spelling sorts below its bound, so apt
+# cannot install ours — nor any version the defer scheme may take — with the
+# Breaks owner installed. Precedence for such a name is already proven by the
+# candidate row; the refusal here is lawful iff the solver text names exactly
+# that wall. Measured 2026-09-07 on sid + trixie (222-name floor, see the
+# S5 logbook): gcc-4.4 (< 4.4.6-4) and gcc-4.5 (< 4.5.3-2), owner libstdc++6.
+breaks_walled() { # name ourver simtext -> rc 0 iff the refusal is an archive Breaks wall
+    local name=$1 ver=$2 sim=$3 owner bound owner_pol owner_status
+    owner=$(grep -oE "([[:alnum:]+_.-]+)(:amd64)? :? Breaks:? $name \(< [^) ]+\)" <<<"$sim" |
+            head -1 | sed -E 's/(:amd64)? :? Breaks:? .*//')
+    bound=$(grep -oE "Breaks:? $name \(< [^) ]+\)" <<<"$sim" |
+            head -1 | sed -E 's/.*\(< ([^) ]+)\)/\1/')
+    [ -n "$owner" ] && [ -n "$bound" ] || return 1
+    # No producer-to-grep -q pipes here: grep -q exits on the first match and
+    # pipefail then reports the kill, not the match (measured: apt-cache
+    # policy raced to 141 on sid). Capture, then grep the here-string.
+    owner_status=$(dpkg-query -W -f '${Status}\n' "$owner" 2>/dev/null || true)
+    grep -q '^install ok installed' <<<"$owner_status" ||
+        return 1   # the wall must be an INSTALLED package
+    owner_pol=$(apt-cache policy "$owner")
+    grep -qE '^\s+[0-9]+\s+https?://' <<<"$owner_pol" ||
+        return 1   # ... archive-shipped, not ours or a stub
+    dpkg --compare-versions "$ver" lt "$bound" ||
+        return 1   # ... and our candidate sits below the bound (defer as designed)
+    echo "      wall: installed archive $owner Breaks: $name (< $bound), ours $ver below it"
+    return 0
+}
+# Committed positive control over doctored solver text: the parser must fire
+# on the two measured line shapes and must not fire on another name or on
+# noise. libstdc++6 is installed and archive-shipped in every baseline image,
+# so the dpkg/policy legs exercise for real.
+doctored=" libstdc++6 : Breaks: gcc-4.4 (< 4.4.6-4) but 4.4~ce4.4.7-1 is to be installed
+      2. libstdc++6:amd64 Breaks gcc-4.4 (< 4.4.6-4)"
+breaks_walled gcc-4.4 0~ce0 "$doctored" >/dev/null ||
+    fail "leg-A control: the Breaks-wall parser missed the doctored solver text"
+breaks_walled gcc-4.4 0~ce0 "garbage with no Breaks" 2>/dev/null &&
+    fail "leg-A control: the parser fired on noise" || :
+breaks_walled gcc-4.3 0~ce0 "$doctored" 2>/dev/null &&
+    fail "leg-A control: the parser fired on the wrong name" || :
 # The plan table rides fd 9, not stdin: a body command that consumed stdin
 # (script(1) forwards it into the pty, provably) would silently drop the
 # remaining emit names. fd 9 + a dead stdin makes the drop impossible.
-shipped=0; ours_only=0
+shipped=0; ours_only=0; walled=0
 while IFS=$'\t' read -r -u 9 name ver; do
     pol=$(apt-cache policy "$name")
     if grep -qE '^\s+[0-9]+\s+https?://' <<<"$pol"; then
@@ -632,12 +673,20 @@ while IFS=$'\t' read -r -u 9 name ver; do
             *) fail "leg-A: $name Inst line is not the distribution's build: $line" ;;
         esac
     else
-        ours_only=$((ours_only + 1))
         [ "$(candidate "$name")" = "$ver" ] ||
             fail "leg-A: $name candidate is '$(candidate "$name")', expected our $ver"
-        case $(inst_line "$name" install "$name") in
+        sim=$(apt-get -s install "$name" 2>&1) || true
+        line=$(grep "^Inst $name " <<<"$sim" || true)
+        case $line in
             "Inst $name ($ver diamondinoia:"*)
+                ours_only=$((ours_only + 1))
                 ok "leg-A: $name resolves OURS ($ver) at pin 100" ;;
+            "")
+                breaks_walled "$name" "$ver" "$sim" ||
+                    fail "leg-A: $name refused with no Breaks wall: $(tail -3 <<<"$sim")"
+                walled=$((walled + 1))
+                ok "leg-A: $name stays OURS ($ver at 100); install walled by an archive Breaks" ;;
+            *) fail "leg-A: $name Inst line is not our offer: $line" ;;
             *) fail "leg-A: $name Inst line is not our offer: $(inst_line "$name" install "$name")" ;;
         esac
     fi
@@ -649,13 +698,14 @@ for n, b in sorted(lite["emits"].items()):
 PY
 ) < /dev/null
 [ "$ours_only" -ge 3 ] ||
-    fail "leg-A non-vacuity: only $ours_only archive-absent names (want >= 3)"
-ok "leg-A non-vacuity: $ours_only archive-absent names, all resolve ours"
+    fail "leg-A non-vacuity: only $ours_only archive-absent resolvable names (want >= 3)"
+ok "leg-A non-vacuity: $ours_only archive-absent names resolve ours, $walled archive-Breaks-walled"
 if [ "$shipped" -ge 1 ]; then
     ok "leg-A non-vacuity: $shipped archive-shipped overlap names, all resolve Debian's"
 else
-    # trixie ships none of the emit names today; the overlap mechanism stands
-    # proven there by the stand-in flip block below.
+    # A thin emit floor can leave a baseline shipping none of our names
+    # (trixie before the manifest completion); then the overlap mechanism
+    # stands proven there by the stand-in flip block below.
     ok "leg-A: the live archive ships none of our names; overlap proven by the flip block"
 fi
 
