@@ -43,7 +43,7 @@ provide, so it can never shadow Debian:
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
-    Package: juno-drivers-diamon
+    Package: juno-drivers-diamon clevo-keyboard-dkms juno-kde-fancontrol
     Pin: release l=diamondinoia
     Pin-Priority: 500
 

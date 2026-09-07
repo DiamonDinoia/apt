@@ -171,6 +171,20 @@ with = ["diamondinoia-repo-juno"]
 description = "Juno drivers with local GRUB and CPU policy, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
+# The keyboard/backlight dkms payload the same fork build now emits beside
+# juno-drivers-diamon. It deposes Juno's unpatched clevo-keyboard deb via
+# Conflicts/Replaces/Provides and juno-drivers-diamon Recommends it, so the
+# index must carry it. The dh_dkms maintainer scripts are the package, hence
+# passthrough again.
+[clevo-keyboard-dkms]
+install = "passthrough"
+repo = "DiamonDinoia/juno-drivers-debian"
+tag = "builds"
+asset = '^clevo-keyboard-dkms_[^_]+_amd64\.deb$'
+version_re = '^clevo-keyboard-dkms_([^_]+)_amd64\.deb$'
+description = "Clevo keyboard/backlight driver (dkms) for Juno laptops, forked build"
+homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
+
 # The fan stack for the same laptops, from DiamonDinoia/juno-kde-fancontrol,
 # whose CI builds the deb through the full container gate (unit tests,
 # privileged-helper integration, install verification, offscreen renders) and
