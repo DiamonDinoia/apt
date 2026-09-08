@@ -1,12 +1,24 @@
-# Package sources for the nightly build.
+# Package sources for the nightly build: hand-written wrappers and third-party
+# [repos]. Every entry produces an installer package: a few kilobytes of
+# maintainer script that downloads the payload from the publisher and checks it
+# against a SHA-256 pinned at build time. Nothing upstream is redistributed.
+# Built packages render to out/<name>_<version>_amd64.deb plus the signed flat
+# index beside them.
 #
-# Every entry produces an installer package: a few kilobytes of maintainer
-# script that downloads the payload from the publisher and checks it against a
-# SHA-256 pinned at build time. Nothing upstream is redistributed.
+# install = "deb"         download a .deb and unpack it into /
+# install = "member"      download an archive and place one executable in
+#                         /usr/bin
+# install = "tree"        download an archive, unpack the application into
+#                         /opt/<name>, symlink the launcher into /usr/bin
+# install = "passthrough" serve a fork-built .deb bit-identical
 #
-# install = "deb"     download a .deb and unpack it into /
-# install = "member"  download an archive and place one executable in /usr/bin
-# install = "tree"    download an archive and place the application in /opt
+# Compiler payloads are never entries here: catalog.py classifies them into
+# catalog.json and build.py emits one bundle per entry, so the [gcc-17] block
+# of the pre-catalog era has no successor to add. The machine files those
+# pipeline stages own have exactly one writer each — edit the writer, never
+# the file: catalog.json (catalog.py), mirror-manifest.json (mirror.py),
+# exceptions.json (test_compilers.sh owns "cutoff", test_failure_modes.sh
+# owns "relr").
 #
 # The version comes from the publisher: a GitHub release tag with a leading "v"
 # stripped, a version_re applied to a JSON feed, or a version_re applied to the
