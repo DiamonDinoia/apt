@@ -1,0 +1,44 @@
+name: validate-precedence
+
+# The distro-precedence suite (test_precedence.sh, D5) against both supported
+# baselines. Dispatch-only on purpose (E23): the run pulls the gcc-16 and
+# cross payloads (about 580 MB) and drives eight clean containers, so it is
+# the record for branch sign-off, not a per-push gate. S8b owns reconciling
+# this against the nightly.
+
+on:
+  workflow_dispatch:
+    inputs:
+      legs:
+        description: "suite legs to run (a,b,cfwd,crev)"
+        default: "a,b,cfwd,crev"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precedence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        baseline: [sid, trixie]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # dpkg-dev + apt-utils for the repo writeout (dpkg-scanpackages,
+      # apt-ftparchive); gpg for the throwaway signing key the suite
+      # generates in-runner (nothing here touches the production key).
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils gpg
+
+      # GH_TOKEN rides to the mirror-release payload fetches in case the
+      # release ever flips visibility or rate-limits anonymous pulls.
+      - name: Run the precedence suite
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./test_precedence.sh --baseline ${{ matrix.baseline }} --legs ${{ github.event.inputs.legs || 'a,b,cfwd,crev' }}
