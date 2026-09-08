@@ -1,10 +1,12 @@
 name: validate-precedence
 
 # The distro-precedence suite (test_precedence.sh, D5) against both supported
-# baselines. Dispatch-only on purpose (E23): the run pulls the gcc-16 and
-# cross payloads (about 580 MB) and drives eight clean containers, so it is
-# the record for branch sign-off, not a per-push gate. S8b owns reconciling
-# this against the nightly.
+# baselines. Dispatch for branch sign-off plus a weekly schedule (E23: the
+# run pulls the gcc-16 and cross payloads, about 580 MB, and drives eight
+# clean containers — cheap enough for a cadence). The scheduled run is the
+# only thing that notices the Debian archives drifting under the shipped
+# defer pins; per-push would pay that cost for repo changes that cannot
+# affect it.
 
 on:
   workflow_dispatch:
@@ -12,10 +14,17 @@ on:
       legs:
         description: "suite legs to run (a,b,cfwd,crev)"
         default: "a,b,cfwd,crev"
+  schedule:
+    # Weekly, offset from the Sunday compiler sweep. Schedules fire on the
+    # default branch only, so this entry is inert on team branches.
+    - cron: "17 7 * * 3"
 
 permissions:
   contents: read
 
+# Read-only: the suite builds its repository in-runner and fetches stable
+# payloads only (never rotated), so unlike validate-compilers it does not
+# take the shared `repo` group. A hand dispatch may preempt a scheduled run.
 concurrency:
   group: precedence-${{ github.ref }}
   cancel-in-progress: true
