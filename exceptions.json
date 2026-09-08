@@ -926,31 +926,31 @@
   "relr": {
     "10/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-10.5.0.tar.xz, series 10) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 10.5.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.40) 2.40; libc6 2.43-5",
       "series": "10",
-      "works": null
+      "works": true
     },
     "10/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-10.5.0.tar.xz, series 10) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 10.5.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.40) 2.40; libc6 2.41-12+deb13u3",
       "series": "10",
-      "works": null
+      "works": true
     },
     "11/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-11.5.0.tar.xz, series 11) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 11.5.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.42) 2.42; libc6 2.43-5",
       "series": "11",
-      "works": null
+      "works": true
     },
     "11/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-11.5.0.tar.xz, series 11) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 11.5.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.42) 2.42; libc6 2.41-12+deb13u3",
       "series": "11",
-      "works": null
+      "works": true
     },
     "16/sid": {
       "baseline": "sid",
@@ -982,73 +982,73 @@
     },
     "5/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-5.5.0.tar.xz, series 5) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "payload driver failed to compile+link hello.c: /opt/gcc-5/bin/../lib/gcc/x86_64-linux-gnu/5.5.0/../../../../x86_64-linux-gnu/bin/ld: /usr/lib/x86_64-linux-gnu/libc.so.6: don't know how to handle section `.relr.dyn' [0x      13]",
       "series": "5",
-      "works": null
+      "works": false
     },
     "5/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-5.5.0.tar.xz, series 5) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "payload driver failed to compile+link hello.c: /opt/gcc-5/bin/../lib/gcc/x86_64-linux-gnu/5.5.0/../../../../x86_64-linux-gnu/bin/ld: /lib/x86_64-linux-gnu/libc.so.6: don't know how to handle section `.relr.dyn' [0x      13]",
       "series": "5",
-      "works": null
+      "works": false
     },
     "6/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-renovated-6.5.0.tar.xz, series 6) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc ; payload ld: GNU ld (Compiler-Explorer-Build-gcc-81dac3d7585c68337c612531f552b0e9799bf91d-binutils-2.40) 2.40; libc6 2.43-5",
       "series": "6",
-      "works": null
+      "works": true
     },
     "6/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-renovated-6.5.0.tar.xz, series 6) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc ; payload ld: GNU ld (Compiler-Explorer-Build-gcc-81dac3d7585c68337c612531f552b0e9799bf91d-binutils-2.40) 2.40; libc6 2.41-12+deb13u3",
       "series": "6",
-      "works": null
+      "works": true
     },
     "7/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-7.5.0.tar.xz, series 7) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "payload driver failed to compile+link hello.c: /opt/gcc-7/bin/../lib/gcc/x86_64-linux-gnu/7.5.0/../../../../x86_64-linux-gnu/bin/ld: /usr/lib/x86_64-linux-gnu/libc.so.6: don't know how to handle section `.relr.dyn' [0x      13]",
       "series": "7",
-      "works": null
+      "works": false
     },
     "7/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-7.5.0.tar.xz, series 7) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "payload driver failed to compile+link hello.c: /opt/gcc-7/bin/../lib/gcc/x86_64-linux-gnu/7.5.0/../../../../x86_64-linux-gnu/bin/ld: /lib/x86_64-linux-gnu/libc.so.6: don't know how to handle section `.relr.dyn' [0x      13]",
       "series": "7",
-      "works": null
+      "works": false
     },
     "8/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-8.5.0.tar.xz, series 8) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "payload driver failed to compile+link hello.c: /opt/gcc-8/bin/../lib/gcc/x86_64-linux-gnu/8.5.0/../../../../x86_64-linux-gnu/bin/ld: warning: /lib/x86_64-linux-gnu/crt1.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0008002",
       "series": "8",
-      "works": null
+      "works": false
     },
     "8/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-8.5.0.tar.xz, series 8) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "payload driver failed to compile+link hello.c: /opt/gcc-8/bin/../lib/gcc/x86_64-linux-gnu/8.5.0/../../../../x86_64-linux-gnu/bin/ld: warning: /lib/x86_64-linux-gnu/crt1.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0008002",
       "series": "8",
-      "works": null
+      "works": false
     },
     "9/sid": {
       "baseline": "sid",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-9.5.0.tar.xz, series 9) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:sid is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 9.5.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.38) 2.38; libc6 2.43-5",
       "series": "9",
-      "works": null
+      "works": true
     },
     "9/trixie": {
       "baseline": "trixie",
-      "measured": "pending-mirror",
-      "reason": "native gcc (asset gcc-9.5.0.tar.xz, series 9) has no mirrored payload; whether its CE-bundled ld (era binutils <= 2.36) mis-links against the SHT_RELR-emitting glibc of debian:trixie is unmeasured",
+      "measured": "2026-09-08",
+      "reason": "ok: hello world compiled, linked and ran ('hello relr'); gcc 9.5.0; payload ld: GNU ld (Compiler-Explorer-Build-gcc--binutils-2.38) 2.38; libc6 2.41-12+deb13u3",
       "series": "9",
-      "works": null
+      "works": true
     }
   },
   "schema": "exceptions.json: curated+measured bundle exceptions, canonical JSON (json.dumps(indent=2, sort_keys=True) + newline), one writer per section: test_failure_modes.sh owns 'relr' (rows keyed '<gcc series>/<baseline>': series 5-11 = the RELR era per E3, 16/17 = control rows outside it; row = {series, baseline, works (true|false|null), measured ('YYYY-MM-DD'|'pending-mirror'), reason}; works is null iff pending-mirror; works:false requires a non-empty evidence reason; pending rows name the unmirrored series and asset). 'cutoff' is reserved for S4 (clang <= 3.x C++ trials); S6 creates it empty and never writes it."
