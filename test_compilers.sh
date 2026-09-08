@@ -124,7 +124,7 @@
 #                 tripwire (same shape as test_failure_modes.sh) refuses a
 #                 run that skipped a check class.
 #   Floor         the mirror is COMPLETE: every catalog payload is mirrored
-#                 (222 emit bundles, zero pending); --sweep asserts it.
+#                 (231 emit bundles, zero pending); --sweep asserts it.
 #                 Concurrency 4; containers --rm; everything scratch under
 #                 one mktemp dir.
 #

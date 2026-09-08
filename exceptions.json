@@ -902,6 +902,24 @@
         },
         "measured": "2026-09-07",
         "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-8-riscv64-linux-gnu": {
+        "links": {
+          "riscv64-linux-gnu-gcc-ar-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "riscv64-linux-gnu-gcc-nm-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "riscv64-linux-gnu-gcc-ranlib-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-08",
+        "reason": "the riscv64-gcc-8.5.0 crosstool payload's gcc-ar/gcc-nm/gcc-ranlib are LTO plugin wrappers whose baked-in liblto_plugin.so search path the relocated tree does not satisfy: every call, even --version, prints 'Cannot find plugin' on stderr and exits rc 1 with no banner (measured 2026-09-08 directly against the mirrored payload on the dev box and in validate-compilers run 34178545349 shard 1/30, both baselines; the other eight riscv64 stables' wrappers answer --version rc 0, so no other riscv64 row exists)"
       }
     }
   },
