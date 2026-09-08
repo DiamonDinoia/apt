@@ -151,6 +151,10 @@ SPARC32 = {"arch": "Sparc v8+", "expected_arch_alts": ["Sparc"],
 
 # family -> naming/classification record. label is our name component for
 # regime != debian. debian_analog names the unversioned Debian package.
+# rename pins the release-asset spelling of the family's trunk rotations
+# (defaults: debian regime => gcc-{major}-trunk{date}-<triplet>, else
+# gcc-{major}-trunk{date}-<label>); set it where the mirrored assets already
+# carry a different spelling, so check keeps classing them trunk-renamed.
 FAMILIES = {
     "arm64-gcc":       {"triplet": "aarch64-linux-gnu",     "regime": "debian", "arch": "AArch64"},
     "arm-gcc":         {"triplet": "arm-linux-gnueabihf",   "regime": "debian", "arch": "ARM"},
@@ -185,6 +189,10 @@ FAMILIES = {
     "sparc-gcc":     {"triplet": None, "regime": "nodebian", "label": "sparc", **SPARC32},
     "sparc-leon-gcc": {"triplet": None, "regime": "nodebian", "label": "sparc-leon", **SPARC32},
     "riscv32-gcc":   {"triplet": None, "regime": "nodebian", "label": "riscv32", "arch": "RISC-V"},
+    # Debian ships the versioned riscv64-linux-gnu cross; the prefix rename is
+    # pinned: the mirrored rotations already carry riscv64-gcc-<major>-trunk<date>.
+    "riscv64-gcc":   {"triplet": "riscv64-linux-gnu", "regime": "debian", "arch": "RISC-V",
+                      "rename": "riscv64-gcc-{major}-trunk{date}"},
     "vax":           {"triplet": None, "regime": "nodebian", "label": "vax", "arch": "Digital VAX"},
 }
 
@@ -930,7 +938,9 @@ def build_catalog(listing: dict[str, dict], yaml_ref: str,
         if frec:
             triplet, regime, arch = frec["triplet"], frec["regime"], frec["arch"]
             alts = frec.get("expected_arch_alts")
-            if regime == "debian":
+            if frec.get("rename"):
+                rename = frec["rename"]
+            elif regime == "debian":
                 rename = "gcc-{major}-trunk{date}-" + triplet
             else:
                 rename = "gcc-{major}-trunk{date}-" + frec["label"]
