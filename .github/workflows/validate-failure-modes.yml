@@ -10,11 +10,6 @@ name: validate-failure-modes
 
 on:
   workflow_dispatch:
-  # TEMPORARY (same shape S4/S5 used: `gh workflow run` 404s on a workflow
-  # absent from the default branch): validate on push to this lane's branch,
-  # remove the trigger once green.
-  push:
-    branches: [team/6b-relr-remeasure]
 
 permissions:
   contents: read
