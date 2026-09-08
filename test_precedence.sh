@@ -687,7 +687,6 @@ while IFS=$'\t' read -r -u 9 name ver; do
                 walled=$((walled + 1))
                 ok "leg-A: $name stays OURS ($ver at 100); install walled by an archive Breaks" ;;
             *) fail "leg-A: $name Inst line is not our offer: $line" ;;
-            *) fail "leg-A: $name Inst line is not our offer: $(inst_line "$name" install "$name")" ;;
         esac
     fi
 done 9< <(python3 - <<'PY'
