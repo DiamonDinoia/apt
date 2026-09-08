@@ -80,11 +80,11 @@
       },
       "clang-19": {
         "baselines": {
-          "sid": false,
+          "sid": true,
           "trixie": true
         },
         "measured": "2026-09-07",
-        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+        "reason": "the header-era boundary sits between 18 and 19: clang-19 compiles and runs C++ against sid's libstdc++-16 headers, measured in run 34170237545 (the first table over-generalized the failing run up to 19 and dispatch 34174266772's unexpected-pass assertion caught it \u2014 E13 doing its job). trixie likewise passes with the default dialect."
       },
       "clang-20": {
         "baselines": {
