@@ -1,0 +1,60 @@
+name: validate-failure-modes
+
+# test_failure_modes.sh (D6) end to end against the real mirror release. E23:
+# a measuring run pulls ~1.4 GB of native gcc payloads (the seven RELR-era
+# series 5..11 plus the k1 truncation fixture), so the measurement runs here
+# and not on the dev box. Dispatch-only by design — the record for the RELR
+# re-measure, not a per-push gate. The measured exceptions.json comes back as
+# an artifact and is committed by the lane that dispatched it (S6b), so its
+# bytes stay emitter-written and its commit keeps the lane attribution.
+
+on:
+  workflow_dispatch:
+  # TEMPORARY (same shape S4/S5 used: `gh workflow run` 404s on a workflow
+  # absent from the default branch): validate on push to this lane's branch,
+  # remove the trigger once green.
+  push:
+    branches: [team/6b-relr-remeasure]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: failure-modes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+
+      - name: Pull base images
+        run: |
+          set -euo pipefail
+          docker pull debian:sid
+          docker pull debian:trixie
+
+      - name: Free runner disk
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+
+      # GITHUB_TOKEN rides to build.py's release listing reads (the suite
+      # re-uses gh's credential when exported; anonymous github.com calls are
+      # capped at 60 req/hr, which the repeated resolve() reads exhaust).
+      - name: Run the failure-modes suite
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./test_failure_modes.sh | tee suite.log
+
+      - name: Upload the measured exceptions.json and the suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-modes-${{ github.run_id }}
+          path: |
+            exceptions.json
+            suite.log
