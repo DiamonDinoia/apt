@@ -12,6 +12,11 @@
 # Check 4: every Filename in the index survives the release host unrewritten.
 # Check 5: the bootstrap package changes version whenever the files it installs
 #          change, because apt offers no upgrade at a version it already holds.
+# Checks 12-17 (D7): the README is code-adjacent; every class of claim it makes
+#          is diffed against the machine files the build itself consumes —
+#          dump-spec, the built pin, exceptions.json, catalog.json and
+#          mirror-manifest.json — and each diff re-runs over a mutated copy as
+#          its own positive control, so a check that stopped seeing cannot pass.
 #
 # Dependency resolution is not checked here. It only means anything against the
 # archive the packages target, and test_install.sh proves it by installing them
@@ -378,6 +383,311 @@ if python3 "$(cd "$(dirname "$0")" && pwd)/build.py" --selftest > "$work/selftes
   echo "ok    bundle-rule selftest clean"
 else
   echo "FAIL  bundle-rule selftest:"; cat "$work/selftest.log"; fail=1
+fi
+
+# The tree root, for checks that read the machine files or list sibling suites.
+doc_tree=$(cd "$(dirname "$0")" && pwd)
+export TEST_TREE=$doc_tree
+
+# Check 12: README-cited package names must exist in the merged spec. A cited
+# name that no longer builds is a dangling promise; the inverse direction
+# (every offer documented) is impossible by size, so the check is one-way.
+# Universe = bundles + wrappers + the bootstrap/repo packages + every bundle's
+# Provides/Conflicts/Replaces names (Debian's analogs are legitimately cited,
+# e.g. gcc-avr). One escape: a rotation-twin (same name with the major one up
+# or down from an in-universe name) is allowed, because the rotation story
+# legitimately names next cycle's bundle (gcc-18 while gcc-17 ships).
+doccheck_names() {  # $1 = a README; rc 1 with the offending names on stdout
+python3 - "$1" "$spec" <<'DOC'
+import json, re, sys
+readme = open(sys.argv[1]).read()
+spec = json.load(open(sys.argv[2]))
+
+universe = (set(spec["bundles"]) | set(spec["wrappers"])
+            | {"diamondinoia-apt"}
+            | {f"diamondinoia-repo-{n}" for n, r in spec["repos"].items()
+               if r.get("separate")})
+for b in spec["bundles"].values():
+    pcr = b.get("pcr")
+    if isinstance(pcr, dict):
+        universe |= set(pcr.get("provides", {}))
+        universe |= set(pcr.get("conflicts", [])) | set(pcr.get("replaces", []))
+
+NS = re.compile(r"^(?:gcc|clang)-\d[0-9a-z.+]*(?:-[a-z0-9]+)*$|^diamondinoia[a-z0-9-]*$")
+BADSTRIP = '\"\'.,;:()'
+
+def allowed(name):
+    if name in universe:
+        return True
+    m = re.match(r"^((?:gcc|clang)-)(\d+)(.*)$", name)
+    return bool(m) and (f"{m.group(1)}{int(m.group(2))-1}{m.group(3)}" in universe
+                        or f"{m.group(1)}{int(m.group(2))+1}{m.group(3)}" in universe)
+
+bad = set()
+tokens = []
+for span in re.findall(r"`([^`\n]+)`", readme):
+    tokens += span.split()
+for line in readme.splitlines():
+    if line.startswith("    "):
+        tokens += line.split()
+for t in tokens:
+    t = t.strip(BADSTRIP).split("=")[0]
+    if (NS.match(t) and not any(c in t for c in "*$/") and not allowed(t)):
+        bad.add(t)
+# Install commands are the strong arm: every non-flag argument is a promise a
+# reader pastes into a shell, so it must resolve here, whatever the namespace.
+for m in re.finditer(r"apt(?:-get)?(?:\s+--?[a-z-]+)*\s+install\s+([^\n#`]*)",
+                     readme):
+    for t in m.group(1).split():
+        t = t.strip(BADSTRIP).split("=")[0]
+        if not t or t.startswith("-") or any(c in t for c in "*$/"):
+            continue
+        if not allowed(t):
+            bad.add(t)
+for t in sorted(bad):
+    print(f"      the README cites {t}, which no spec entry, repo package or "
+          "claimable name provides")
+sys.exit(bool(bad))
+DOC
+}
+if doccheck_names README.md; then
+  echo "ok    every package name the README cites exists in the merged spec"
+else
+  echo "FAIL  the README cites package names the spec does not carry"; fail=1
+fi
+sed 's/sudo apt-get install juno-drivers-diamon/sudo apt-get install juno-drivers-diamon gcc-99/' \
+    README.md > "$work/readme-mut"
+if doccheck_names "$work/readme-mut" >/dev/null 2>&1; then
+  echo "FAIL  positive control: a README citing gcc-99 passed the citation check"
+  fail=1
+else
+  echo "ok    positive control: a README citing gcc-99 is refused"
+fi
+
+# Check 13: the README's known-broken install-refusal list is exactly
+# exceptions.json's cutoff.install_refusals rows. The refusal set is measured
+# (the apt -s census), so a README that lists more or fewer differs from the
+# measurement. A fence the regex cannot find reads as empty and the diff
+# reports every recorded row missing, so a broken parse cannot pass.
+doccheck_refusals() {  # $1 = a README
+python3 - "$1" <<'DOC'
+import json, re, sys
+exc = json.load(open("exceptions.json"))["cutoff"]["install_refusals"]
+readme = open(sys.argv[1]).read()
+m = re.search(r"cutoff\.install_refusals`? and the matrix asserts them\s+in"
+              r"\s+both\s+directions:\n\n((?:    [^\n]+\n)+)", readme)
+listed = set(m.group(1).split()) if m else set()
+bad = False
+for n in sorted(set(exc) - listed):
+    print(f"      exceptions.json records {n} refusing to install, the README does not")
+    bad = True
+for n in sorted(listed - set(exc)):
+    print(f"      the README lists {n} as refusing to install, no exceptions row backs it")
+    bad = True
+sys.exit(bad or not listed)
+DOC
+}
+if doccheck_refusals README.md; then
+  echo "ok    the README's install-refusal list equals exceptions.json's"
+else
+  echo "FAIL  the README and exceptions.json disagree on install refusals"; fail=1
+fi
+sed 's/  gcc-4.5$//' README.md > "$work/readme-mut"
+if doccheck_refusals "$work/readme-mut" >/dev/null 2>&1; then
+  echo "FAIL  positive control: a README missing gcc-4.5 passed the refusal check"
+  fail=1
+else
+  echo "ok    positive control: a README missing a refusal row is refused"
+fi
+
+# Check 14: the README prints the pin the bootstrap installs, whole file: all
+# four stanzas, and the two non-enumerated stanzas in glob form in the BUILT
+# preferences (Package: * at -1; the compiler namespace as gcc-* clang-* at
+# 100). Stanza contents compare as whitespace-insensitive sets, so wrapping or
+# ordering drift still fails while line-folding style stays free.
+doccheck_pins() {  # $1 = a README  $2 = the built preferences file
+python3 - "$1" "$2" <<'DOC'
+import re, sys
+readme, prefs = open(sys.argv[1]).read(), open(sys.argv[2]).read()
+
+def stanza_set(text):
+    out = []
+    for block in re.split(r"\n\s*\n", text.strip()):
+        # unfold continuation lines, then collapse all whitespace
+        joined = re.sub(r"\n\s+", " ", block)
+        out.append(re.sub(r"\s+", " ", joined).strip())
+    return set(out)
+
+def globforms(text):
+    m100 = re.search(r"^Package: ([^\n]*)\nPin: release l=diamondinoia\n"
+                     r"Pin-Priority: 100$", text, re.M)
+    catchall = re.search(r"^Package: \*\nPin: release l=diamondinoia\n"
+                         r"Pin-Priority: -1$", text, re.M)
+    toks = m100.group(1).split() if m100 else []
+    return bool(catchall) and toks[:2] == ["gcc-*", "clang-*"]
+
+m = re.search(r"(?m)^    Package: \*\n(?:    [^\n]*\n|\n)+", readme)
+doc = stanza_set("\n".join(l[4:] if l.startswith("    ") else ""
+                           for l in m.group(0).splitlines())) if m else set()
+built = stanza_set(prefs)
+bad = False
+if len(built) < 4:
+    print(f"      the built pin has {len(built)} stanzas, expected 4"); bad = True
+if not globforms(prefs):
+    print("      the built pin lost the glob form of the -1 or 100 stanza")
+    bad = True
+if doc != built:
+    print(f"      README stanzas != built stanzas:\n"
+          f"        only README: {sorted(doc - built)}\n"
+          f"        only built:  {sorted(built - doc)}")
+    bad = True
+sys.exit(bad)
+DOC
+}
+# The built preference file, fresh from the bootstrap deb (check 8 extracted
+# the same bytes; this keeps the block self-contained).
+prefsfile=$work/prefs-doc
+dpkg-deb --fsys-tarfile "$repo/$boot" |
+    tar -xO ./etc/apt/preferences.d/diamondinoia > "$prefsfile" 2>/dev/null
+if doccheck_pins README.md "$prefsfile"; then
+  echo "ok    the README prints the pin file the bootstrap package installs, glob stanzas included"
+else
+  echo "FAIL  the README pin block and the built pin disagree"; fail=1
+fi
+sed 's/    Package: gcc-\* clang-\*/    Package: gcc-17/' README.md > "$work/readme-mut"
+if doccheck_pins "$work/readme-mut" "$prefsfile" >/dev/null 2>&1; then
+  echo "FAIL  positive control: a README with an enumerated 100 stanza passed"
+  fail=1
+else
+  echo "ok    positive control: an enumerated 100 stanza in the README is refused"
+fi
+
+# Check 15: bidirectional test-suite roster. The suites this repository has and
+# the suites the README tells a reader about must be the same set, both ways.
+doccheck_roster() {  # $1 = a README
+python3 - "$1" <<'DOC'
+import os, re, sys
+tree = os.environ["TEST_TREE"]
+ondisk = {f for f in os.listdir(tree)
+          if f.startswith("test_") and f.endswith(".sh")}
+cited = set(re.findall(r"\btest_[a-z0-9_]+\.sh\b", open(sys.argv[1]).read()))
+bad = False
+for n in sorted(ondisk - cited):
+    print(f"      {n} exists but the README never names it"); bad = True
+for n in sorted(cited - ondisk):
+    print(f"      the README names {n}, which does not exist"); bad = True
+sys.exit(bad or not cited)
+DOC
+}
+if doccheck_roster README.md; then
+  echo "ok    the README's suite roster matches the files, both directions"
+else
+  echo "FAIL  suite roster drift between the README and the tree"; fail=1
+fi
+sed 's/test_precedence\.sh/the precedence suite/g' README.md > "$work/readme-mut"
+if doccheck_roster "$work/readme-mut" >/dev/null 2>&1; then
+  echo "FAIL  positive control: a README not naming test_precedence.sh passed"
+  fail=1
+else
+  echo "ok    positive control: dropping a suite citation is refused"
+fi
+
+# Check 16: failure-mode prose keyed to asserted error strings. The paragraph
+# starting "The failure classes are loud by design" quotes apt/build/postinst
+# texts that must exist verbatim in one of the test suites the same paragraph
+# names — prose may never quote a failure text no suite asserts. Spans elided
+# with ... check fragment by fragment.
+doccheck_strings() {  # $1 = a README
+python3 - "$1" <<'DOC'
+import os, re, sys
+tree = os.environ.get("TEST_TREE", os.getcwd())
+readme = open(sys.argv[1]).read()
+para = next((p for p in readme.split("\n\n")
+             if "loud by design" in p), None)
+if para is None:
+    print("      no failure-classes paragraph found — the check is blind")
+    sys.exit(1)
+suites = sorted(set(re.findall(r"`(test_[a-z0-9_]+\.sh|build\.py)`", para)))
+strings = [s for s in re.findall(r"`([^`\n]+)`", para)
+           if s not in suites]
+bodies = {}
+for s in suites:
+    with open(os.path.join(tree, s)) as f:
+        bodies[s] = f.read()
+bad = False
+for s in strings:
+    frags = [f for f in s.split("...") if f]
+    for f in frags:
+        if not any(f in b for b in bodies.values()):
+            print(f"      {f!r} (from {s!r}) appears in none of {suites}")
+            bad = True
+sys.exit(bad or not strings or not suites)
+DOC
+}
+if doccheck_strings README.md; then
+  echo "ok    every quoted failure text is asserted by a named suite"
+else
+  echo "FAIL  the README quotes failure texts no named suite asserts"; fail=1
+fi
+sed 's/no asset matches/no asset m4tches/' README.md > "$work/readme-mut"
+if doccheck_strings "$work/readme-mut" >/dev/null 2>&1; then
+  echo "FAIL  positive control: a doctored failure string passed"
+  fail=1
+else
+  echo "ok    positive control: a doctored failure string is refused"
+fi
+
+# Check 17: the scale numbers in the mirror section re-derive from
+# catalog.json, mirror-manifest.json and the spec — a refactor that changes the
+# counts must change the prose on purpose, not by drift. Patterns that fail to
+# find their sentence read as missing and refuse, so an edit that rewords the
+# sentence must move the check deliberately.
+doccheck_scale() {  # $1 = a README
+python3 - "$1" <<'DOC'
+import json, re, os, sys
+tree = os.environ["TEST_TREE"]
+readme = open(sys.argv[1]).read()
+cat = json.load(open(tree + "/catalog.json"))
+man = json.load(open(tree + "/mirror-manifest.json"))
+rows = man["rows"]
+computed = {
+    "stables": len(cat["packaged"]),
+    "fams": len(cat["trunk_families"]),
+    "bundles": len(cat["packaged"]) + len(cat["trunk_families"]),
+    "rows": len(rows),
+    "gib": round(sum(r["size"] for r in rows.values()) / 2**30),
+}
+claims = {
+    "stables": (r"(\d+) catalog payloads \(the latest point release", 1),
+    "fams": (r"Nightlies rotate: (\d+) trunk families \(native", 1),
+    "bundles": (r"becomes one bundle deb:\s*(\d+) emitted today", 1),
+    "rows": (r"That is (\d+) mirrored payloads,\s+roughly\s+\d+ GiB", 1),
+    "gib": (r"That is \d+ mirrored payloads,\s+roughly\s+(\d+) GiB", 1),
+}
+bad = False
+for key, (pat, group) in claims.items():
+    m = re.search(pat, readme)
+    if not m:
+        print(f"      the {key} sentence is gone; the check cannot see it")
+        bad = True
+    elif int(m.group(group)) != computed[key]:
+        print(f"      README says {key}={m.group(group)}, machine files say "
+              f"{computed[key]}")
+        bad = True
+sys.exit(bad)
+DOC
+}
+if doccheck_scale README.md; then
+  echo "ok    the README's scale numbers re-derive from the machine files"
+else
+  echo "FAIL  the README's scale numbers do not match the machine files"; fail=1
+fi
+sed 's/That is 238 mirrored payloads/That is 237 mirrored payloads/' README.md > "$work/readme-mut"
+if doccheck_scale "$work/readme-mut" >/dev/null 2>&1; then
+  echo "FAIL  positive control: a wrong payload count passed the scale check"
+  fail=1
+else
+  echo "ok    positive control: a drifted payload count is refused"
 fi
 
 exit $fail
