@@ -1,9 +1,274 @@
 {
   "cutoff": {
     "clang_cutoff": {
-      "measured": "2026-09-05",
-      "policy": "clang series \u22643.9 \u2192 L1",
-      "result": "3.3: plain C link fails ('cannot find crtbegin.o': the driver predates multiversion GCC discovery; --gcc-toolchain is unrecognized); C with -B/-L /usr/lib/gcc/x86_64-linux-gnu/16 compiles and runs (s4-c-5050); C++ fails on libstdc++-16-dev headers (/usr/include/c++/16/bits/stl_function.h:442:10: error: use of undeclared identifier '__UINTPTR_TYPE__')"
+      "measured": "2026-09-07",
+      "policy": "clang series \u22643.3 \u2192 L1",
+      "result": "3.3: plain C link fails ('cannot find crtbegin.o': the driver predates multiversion GCC discovery; --gcc-toolchain is unrecognized); C with -B/-L /usr/lib/gcc/x86_64-linux-gnu/16 compiles and runs (s4-c-5050); C++ fails on libstdc++-16-dev headers (/usr/include/c++/16/bits/stl_function.h:442:10: error: use of undeclared identifier '__UINTPTR_TYPE__') Re-split 2026-09-07 (run 34170237545 + carrier campaign): clang-3.9's plain-C link SUCCEEDS on today's sid and trixie, so the driver-era cutoff covers 3.2/3.3 only; clang-3.9 runs as a full L1 entry."
+    },
+    "cxx_policy": {
+      "clang-10": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-11": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-12": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-13": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-14": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-15": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-16": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-17": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-18": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-19": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-20": {
+        "baselines": {
+          "sid": true,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "the C++ leg compiles and runs against both baselines' headers (sid libstdc++-16, trixie libstdc++-14). measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-21": {
+        "baselines": {
+          "sid": true,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "the C++ leg compiles and runs against both baselines' headers (sid libstdc++-16, trixie libstdc++-14). measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-22": {
+        "baselines": {
+          "sid": true,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "the C++ leg compiles and runs against both baselines' headers (sid libstdc++-16, trixie libstdc++-14). measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-23": {
+        "baselines": {
+          "sid": true,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "the C++ leg compiles and runs against both baselines' headers (sid libstdc++-16, trixie libstdc++-14). measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-4.0": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "era default dialect is gnu++98, under which <numeric>'s std::iota is absent; with -std=c++11 (era_smoke.cxx_flags) and the clang++ driver the trixie (gcc-14 headers) C++ leg compiles and runs, while sid's gcc-16 headers use builtins this front-end predates at any dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-5": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "era default dialect is gnu++98, under which <numeric>'s std::iota is absent; with -std=c++11 (era_smoke.cxx_flags) and the clang++ driver the trixie (gcc-14 headers) C++ leg compiles and runs, while sid's gcc-16 headers use builtins this front-end predates at any dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-6": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-7": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-8": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      },
+      "clang-9": {
+        "baselines": {
+          "sid": false,
+          "trixie": true
+        },
+        "measured": "2026-09-07",
+        "reason": "against today's sid (libstdc++-16 headers) this front-end predates the headers' builtins at any dialect; against trixie's libstdc++-14 headers the C++ leg compiles and runs with the default dialect. measured 2026-09-07 (validate-compilers run 34170237545 + the clang++ dialect campaign) on debian:sid@sha256:3014a9a9...4f6f and debian:trixie@sha256:6788062a...f3b1; both directions asserted"
+      }
+    },
+    "era_smoke": {
+      "clang-4.0": {
+        "c_flags": [],
+        "cxx_flags": [
+          "-std=c++11"
+        ],
+        "measured": "2026-09-07",
+        "reason": "era default dialect is gnu++98; the C++ smoke needs -std=c++11 for std::iota (measured in the dialect campaign c5 on both baselines). C needs nothing.",
+        "version": "4.0~ce4.0.1-1"
+      },
+      "clang-5": {
+        "c_flags": [],
+        "cxx_flags": [
+          "-std=c++11"
+        ],
+        "measured": "2026-09-07",
+        "reason": "era default dialect is gnu++98; the C++ smoke needs -std=c++11 for std::iota (measured in the dialect campaign c5 on both baselines). C needs nothing.",
+        "version": "5~ce5.0.2-1"
+      },
+      "gcc-3.4": {
+        "c_flags": [
+          "-I/usr/include/x86_64-linux-gnu",
+          "-B/usr/lib/x86_64-linux-gnu"
+        ],
+        "cxx_flags": [],
+        "measured": "2026-09-07",
+        "reason": "CE built this payload without multiarch search paths; today's glibc keeps bits/ headers and crt*.o under /usr/{include,lib}/x86_64-linux-gnu, so the smoke injects those dirs explicitly (payload ld copes; measured 2026-09-07 in the flag-matrix campaign on sid AND trixie: -I + -B compiles, links and runs s4-c-5050, and plain still fails). Both directions asserted.",
+        "version": "3.4~ce3.4.6-1"
+      },
+      "gcc-4.0": {
+        "c_flags": [
+          "-I/usr/include/x86_64-linux-gnu",
+          "-B/usr/lib/x86_64-linux-gnu"
+        ],
+        "cxx_flags": [],
+        "measured": "2026-09-07",
+        "reason": "CE built this payload without multiarch search paths; today's glibc keeps bits/ headers and crt*.o under /usr/{include,lib}/x86_64-linux-gnu, so the smoke injects those dirs explicitly (payload ld copes; measured 2026-09-07 in the flag-matrix campaign on sid AND trixie: -I + -B compiles, links and runs s4-c-5050, and plain still fails). Both directions asserted.",
+        "version": "4.0~ce4.0.4-1"
+      },
+      "gcc-4.1": {
+        "c_flags": [
+          "-I/usr/include/x86_64-linux-gnu",
+          "-B/usr/lib/x86_64-linux-gnu"
+        ],
+        "cxx_flags": [],
+        "measured": "2026-09-07",
+        "reason": "CE built this payload without multiarch search paths; today's glibc keeps bits/ headers and crt*.o under /usr/{include,lib}/x86_64-linux-gnu, so the smoke injects those dirs explicitly (payload ld copes; measured 2026-09-07 in the flag-matrix campaign on sid AND trixie: -I + -B compiles, links and runs s4-c-5050, and plain still fails). Both directions asserted.",
+        "version": "4.1~ce4.1.2-1"
+      },
+      "gcc-4.9": {
+        "c_flags": [
+          "-I/usr/include/x86_64-linux-gnu",
+          "-B/usr/lib/x86_64-linux-gnu"
+        ],
+        "cxx_flags": [],
+        "measured": "2026-09-07",
+        "reason": "CE built this payload without multiarch search paths; today's glibc keeps bits/ headers and crt*.o under /usr/{include,lib}/x86_64-linux-gnu, so the smoke injects those dirs explicitly (payload ld copes; measured 2026-09-07 in the flag-matrix campaign on sid AND trixie: -I + -B compiles, links and runs s4-c-5050, and plain still fails). Both directions asserted.",
+        "version": "4.9~ce4.9.4-1"
+      },
+      "gcc-5": {
+        "c_flags": [
+          "-B/usr/bin"
+        ],
+        "cxx_flags": [
+          "-std=c++11",
+          "-B/usr/bin"
+        ],
+        "extras": [
+          "binutils"
+        ],
+        "measured": "2026-09-07",
+        "reason": "the payload's bundled ld (era binutils) mis-handles today's glibc objects ('don't know how to handle' libc.so.6; 'unsupported GNU_PROPERTY' on crt1.o), so the smoke links via the baseline's ld (-B/usr/bin); measured 2026-09-07 in the flag campaign on sid and trixie (all green, plain control still fails). Both directions asserted. binutils is NOT in the bundle's Depends (the payload carries its own era ld and nothing NEEDs binutils' libs), so the suite provides it as a measured harness extra, exactly like the clang dev-split extras; without it /usr/bin/ld does not exist and -B/usr/bin is a no-op (probe-proven 2026-09-07). Adjacent to S6's RELR rows but not the same probe: this suite exercises the install journey with a baseline-provided linker. C++ reaches s4-cpp-5050 with -std=c++11 (era default dialect is gnu++98) and the baseline-ld link on both baselines.",
+        "version": "5~ce5.5.0-1"
+      },
+      "gcc-7": {
+        "c_flags": [
+          "-B/usr/bin"
+        ],
+        "cxx_flags": [
+          "-B/usr/bin"
+        ],
+        "extras": [
+          "binutils"
+        ],
+        "measured": "2026-09-07",
+        "reason": "the payload's bundled ld (era binutils) mis-handles today's glibc objects ('don't know how to handle' libc.so.6; 'unsupported GNU_PROPERTY' on crt1.o), so the smoke links via the baseline's ld (-B/usr/bin); measured 2026-09-07 in the flag campaign on sid and trixie (all green, plain control still fails). Both directions asserted. binutils is NOT in the bundle's Depends (the payload carries its own era ld and nothing NEEDs binutils' libs), so the suite provides it as a measured harness extra, exactly like the clang dev-split extras; without it /usr/bin/ld does not exist and -B/usr/bin is a no-op (probe-proven 2026-09-07). Adjacent to S6's RELR rows but not the same probe: this suite exercises the install journey with a baseline-provided linker.",
+        "version": "7~ce7.5.0-1"
+      },
+      "gcc-8": {
+        "c_flags": [
+          "-B/usr/bin"
+        ],
+        "cxx_flags": [
+          "-B/usr/bin"
+        ],
+        "extras": [
+          "binutils"
+        ],
+        "measured": "2026-09-07",
+        "reason": "the payload's bundled ld (era binutils) mis-handles today's glibc objects ('don't know how to handle' libc.so.6; 'unsupported GNU_PROPERTY' on crt1.o), so the smoke links via the baseline's ld (-B/usr/bin); measured 2026-09-07 in the flag campaign on sid and trixie (all green, plain control still fails). Both directions asserted. binutils is NOT in the bundle's Depends (the payload carries its own era ld and nothing NEEDs binutils' libs), so the suite provides it as a measured harness extra, exactly like the clang dev-split extras; without it /usr/bin/ld does not exist and -B/usr/bin is a no-op (probe-proven 2026-09-07). Adjacent to S6's RELR rows but not the same probe: this suite exercises the install journey with a baseline-provided linker.",
+        "version": "8~ce8.5.0-1"
+      }
     },
     "install_refusals": {
       "gcc-4.4": {
@@ -28,6 +293,266 @@
       }
     },
     "ldd": {
+      "clang-12": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 12 bundles libc++ without rpath to its libc++abi. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-13": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 13 adds the libatomic dependency of libc++. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-14": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 14 adds the libatomic dependency of libc++. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-15": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libompd.so",
+            "libomp.so"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 15's libompd needs libomp from the payload without rpath. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-16": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libompd.so",
+            "libomp.so"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.8.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 16's ompd gdb plugin NEEDs libpython3.8 which no baseline ships. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-17": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libompd.so",
+            "libomp.so"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.8.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 17's ompd gdb plugin NEEDs libpython3.8 which no baseline ships. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-18": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libompd.so",
+            "libomp.so"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.8.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 18 builds the libc++/libc++abi stack against libunwind without rpath. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-19": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.8.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 19 builds the libc++/libc++abi stack against libunwind without rpath. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-20": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.10.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 20's ompd gdb plugin NEEDs libpython3.10 which no baseline ships. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-21": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.10.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 21's ompd gdb plugin NEEDs libpython3.10 which no baseline ships. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-22": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.10.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 22's ompd gdb plugin NEEDs libpython3.10 which no baseline ships. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-23": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libatomic.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ],
+          [
+            "libc++.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "libc++abi.so.1.0",
+            "libunwind.so.1"
+          ],
+          [
+            "ompdModule.so",
+            "libpython3.10.so.1.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 23's ompd gdb plugin NEEDs libpython3.10 which no baseline ships. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
       "clang-24": {
         "files": [
           [
@@ -53,6 +578,330 @@
         ],
         "measured": "2026-09-05",
         "reason": "clang-trunk payload runtime libs that no Depends can resolve, measured by S4's sweep on debian:sid after install with the bundle's declared Depends: the payload's libc++/libc++abi are linked against libunwind.so.1 with no rpath (upstream LLVM builds them so, and libc++.so.1.0 also NEEDs libatomic.so.1 from the gcc runtime tree, which the bundle's Depends (rightly: the compiler itself never runs it) do not carry; a user links these only by opting into the payload's own C++ runtime), and share/gdb/python/ompd/ompdModule.so NEEDs libpython3.10.so.1.0, a soname no sid/trixie package ships. Asserted both directions: a surprise not-found fails the matrix as hard as one of these unexpectedly resolving."
+      },
+      "clang-4.0": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 4.0 bundles libc++ without rpath to its libc++abi. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-5": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 5 bundles libc++ without rpath to its libc++abi. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "clang-6": {
+        "files": [
+          [
+            "libc++.so.1.0",
+            "libc++abi.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "payload-internal runtime-lib chain that ldd cannot resolve from the system loader path: the payload ships libc++/libc++abi (and friends) without rpath entries, so the chain resolves only when a user opts into the payload's own C++ runtime; clang 6 bundles libc++ without rpath to its libc++abi. Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-10": {
+        "files": [
+          [
+            "libgfortran.so.5.0.0",
+            "libquadmath.so.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran NEEDs the payload's own libquadmath Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-11": {
+        "files": [
+          [
+            "libgfortran.so.5.0.0",
+            "libquadmath.so.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran NEEDs the payload's own libquadmath Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-11-powerpc64-linux-gnu": {
+        "files": [
+          [
+            "powerpc64-unknown-linux-gnu-gdb",
+            "libncursesw.so.6"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: the bundled gdb links libncursesw.so.6 which the bundle Depends do not carry (the cross gdb is a payload extra, not a driver dep) Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-12": {
+        "files": [
+          [
+            "libgfortran.so.5.0.0",
+            "libquadmath.so.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran NEEDs the payload's own libquadmath Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-4.1": {
+        "files": [
+          [
+            "libmpfr.so.1.2.2",
+            "libgmp.so.3"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libmpfr.so.1.2.2 NEEDs the payload's own libgmp.so.3 Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-4.9": {
+        "files": [
+          [
+            "libgfortran.so.3.0.0",
+            "libquadmath.so.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran NEEDs the payload's own libquadmath Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-5": {
+        "files": [
+          [
+            "libgfortran.so.3.0.0",
+            "libquadmath.so.0"
+          ],
+          [
+            "libgomp-plugin-host_nonshm.so.1.0.0",
+            "libgomp.so.1"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran -> payload libquadmath; the host_nonshm gomp plugin -> payload libgomp Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-7": {
+        "files": [
+          [
+            "libgfortran.so.4.0.0",
+            "libquadmath.so.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran NEEDs the payload's own libquadmath Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-8": {
+        "files": [
+          [
+            "libgfortran.so.5.0.0",
+            "libquadmath.so.0"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran NEEDs the payload's own libquadmath Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      },
+      "gcc-9": {
+        "files": [
+          [
+            "libgfortran.so.5.0.0",
+            "libquadmath.so.0"
+          ],
+          [
+            "libgphobos.so.76.0.3",
+            "libgdruntime.so.76"
+          ]
+        ],
+        "measured": "2026-09-07",
+        "reason": "gcc era stables ship their Fortran/Go/OpenMP support libs without rpath to their vendored siblings: libgfortran -> payload libquadmath; libgphobos -> payload libgdruntime Asserted both directions on sid and trixie; measured in validate-compilers run 34170237545 (debian:sid@sha256:3014a9a92a183084b82c9cf282d84f6feb39fcff6760cfc38b8c18ef79f1d67a, debian:trixie@sha256:6788062a1b42ac281f053ac876170b79a3eaed5d61383b8ed7eaca6c6965f3b1)."
+      }
+    },
+    "link_version_rc": {
+      "clang-3.9": {
+        "links": {
+          "clang-cl-3.9": {
+            "rc": 1,
+            "stderr": "unknown argument ignored in clang-cl: '--version'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "era clang-cl is a driver mode, not a --version-answering binary: '--version' is an unknown argument and clang-cl then exits rc 1 for lack of input files (measured in the banner campaign 2026-09-07). The warning text is the answer."
+      },
+      "clang-4.0": {
+        "links": {
+          "clang-cl-4.0": {
+            "rc": 1,
+            "stderr": "unknown argument ignored in clang-cl: '--version'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "era clang-cl is a driver mode, not a --version-answering binary: '--version' is an unknown argument and clang-cl then exits rc 1 for lack of input files (measured in the banner campaign 2026-09-07). The warning text is the answer."
+      },
+      "clang-5": {
+        "links": {
+          "clang-cl-5": {
+            "rc": 1,
+            "stderr": "unknown argument ignored in clang-cl: '--version'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "era clang-cl is a driver mode, not a --version-answering binary: '--version' is an unknown argument and clang-cl then exits rc 1 for lack of input files (measured in the banner campaign 2026-09-07). The warning text is the answer."
+      },
+      "gcc-15": {
+        "links": {
+          "gcobc-15": {
+            "rc": 127,
+            "stderr": "exec: /usr/bin/gcobol: not found"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "/opt/gcc-15/bin/gcobc is a script that execs the absolute /usr/bin/gcobol, which exists in neither the payload nor the baseline (CE's relocate broke the COBOL driver's helper path; measured 2026-09-07). rc 127 + the exec error text is the measured answer."
+      },
+      "gcc-4.8.0": {
+        "links": {
+          "gcc-ar-4.8": {
+            "rc": 1,
+            "stderr": "Cannot find binary 'ar'"
+          },
+          "gcc-nm-4.8": {
+            "rc": 1,
+            "stderr": "Cannot find binary 'nm'"
+          },
+          "gcc-ranlib-4.8": {
+            "rc": 1,
+            "stderr": "Cannot find binary 'ranlib'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era gcc-ar/nm/ranlib wrappers exec plain 'ar/nm/ranlib' from GCC_EXEC_PREFIX-derived paths, not the baseline PATH; the payload ships none of the three and even installing binutils leaves them rc=1 (measured in the banner campaign 2026-09-07). rc 1 + the exact error text is the measured answer; a wrapper that starts answering fails the run as a stale row."
+      },
+      "gcc-6-aarch64-linux-gnu": {
+        "links": {
+          "aarch64-linux-gnu-gcc-ar-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "aarch64-linux-gnu-gcc-nm-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "aarch64-linux-gnu-gcc-ranlib-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-6-arm-linux-gnueabihf": {
+        "links": {
+          "arm-linux-gnueabihf-gcc-ar-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "arm-linux-gnueabihf-gcc-nm-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "arm-linux-gnueabihf-gcc-ranlib-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-6-powerpc64le-linux-gnu": {
+        "links": {
+          "powerpc64le-linux-gnu-gcc-ar-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "powerpc64le-linux-gnu-gcc-nm-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "powerpc64le-linux-gnu-gcc-ranlib-6": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-7-aarch64-linux-gnu": {
+        "links": {
+          "aarch64-linux-gnu-gcc-ar-7": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "aarch64-linux-gnu-gcc-nm-7": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "aarch64-linux-gnu-gcc-ranlib-7": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-7-arm-linux-gnueabihf": {
+        "links": {
+          "arm-linux-gnueabihf-gcc-ar-7": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "arm-linux-gnueabihf-gcc-nm-7": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "arm-linux-gnueabihf-gcc-ranlib-7": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-8-aarch64-linux-gnu": {
+        "links": {
+          "aarch64-linux-gnu-gcc-ar-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "aarch64-linux-gnu-gcc-nm-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "aarch64-linux-gnu-gcc-ranlib-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
+      },
+      "gcc-8-arm-linux-gnueabihf": {
+        "links": {
+          "arm-linux-gnueabihf-gcc-ar-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "arm-linux-gnueabihf-gcc-nm-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          },
+          "arm-linux-gnueabihf-gcc-ranlib-8": {
+            "rc": 1,
+            "stderr": "Cannot find plugin 'liblto_plugin.so'"
+          }
+        },
+        "measured": "2026-09-07",
+        "reason": "the era cross gcc-ar/nm/ranlib wrappers look for liblto_plugin.so under the payload's libexec paths; the payload was built without LTO plugin (measured in the banner campaign 2026-09-07). rc 1 + 'Cannot find plugin' is the measured answer."
       }
     }
   },

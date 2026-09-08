@@ -53,8 +53,17 @@ import tempfile
 # The recorded payload-readelf spellings of target machines the stock
 # spelling does not cover. Numeric e_machine (manifest-measured at mirror
 # time) is the identity anchor; Kalray's binutils rebrands EM_KVARC, measured
-# 2026-09-05 on k1-gcc-7.5.0's payload readelf.
-ARCH_ALIASES = {"KM211 KVARC processor": {"Kalray-1 Processor"}}
+# 2026-09-05 on k1-gcc-7.5.0's payload readelf; Infineon rebrands TriCore in
+# gcc-11-tricore's payload, measured in run 34170237545.
+ARCH_ALIASES = {"KM211 KVARC processor": {"Kalray-1 Processor"},
+                "Siemens Tricore": {"Infineon Tricore"}}
+
+# e_machine spellings a compiled cross object legitimately carries when the
+# manifest's probe of the payload's own binaries says a sibling: SPARC
+# objects from a plain-sparc toolchain are EM_SPARC32PLUS (18) while the
+# payload anchors EM_SPARC (2) — measured on gcc-{12..15}-sparc, run
+# 34170237545.
+EMACHINE_ALIASES = {2: {18}}
 
 
 def ldd_diff(actual, expected):
@@ -177,12 +186,15 @@ def collect_jobs(tmp, names, bases, emit=print):
                     em = re.search(r"emachine=(\d+)", txt)
                     machine = m.group(1).strip() if m else ""
                     want = meta["expected_arch"]
-                    allowed = {want} | ARCH_ALIASES.get(want, set())
+                    allowed = ({want} | set(meta.get("expected_arch_alts", []))
+                               | ARCH_ALIASES.get(want, set()))
                     if machine not in allowed and not re.fullmatch(
                             r"<unknown>: 0x[0-9a-f]+", machine):
                         fail(f"{name}/{base}: Machine '{machine}' not in "
                              f"{sorted(allowed)}")
-                    if not em or int(em.group(1)) != meta["target_emachine"]:
+                    em_allowed = {meta["target_emachine"]} | \
+                        EMACHINE_ALIASES.get(meta["target_emachine"], set())
+                    if not em or int(em.group(1)) not in em_allowed:
                         fail(f"{name}/{base}: e_machine "
                              f"{em and em.group(1)} != manifest "
                              f"{meta['target_emachine']}")

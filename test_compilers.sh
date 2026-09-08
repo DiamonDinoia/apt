@@ -66,6 +66,25 @@
 #                 directions: the design row pins our version + the exact
 #                 Breaks clause in the apt output; an unexpected install or a
 #                 drifted refusal text both fail.
+#                 "era_smoke": bundle -> {c_flags, cxx_flags, extras, version,
+#                 measured, reason} = flag sets the smoke needs on today's
+#                 baselines (multiarch header/startfile injection for the
+#                 3.4-4.1/4.9 payloads; baseline-ld -B/usr/bin for the 5/7/8
+#                 payloads whose bundled ld pre-dates .relr.dyn; -std=c++11
+#                 dialect for era C++). extras (binutils) are installed by the
+#                 runner, loudly, never declared by the bundle. Asserted both
+#                 directions: plain must still FAIL (the row is necessary)
+#                 and flagged must compile+run (sufficient).
+#                 "cxx_policy": bundle -> {baselines {sid, trixie -> bool},
+#                 measured, reason} = per-series C++ verdict; every L2 clang
+#                 stable must have a row. False legs assert the exact failing
+#                 evidence; an unexpected pass fails as a stale row.
+#                 "link_version_rc": bundle -> {links {link -> {rc, stderr}},
+#                 measured, reason} = links that answer --version only with a
+#                 measured non-zero rc + error text (era gcc-ar/nm/ranlib
+#                 plugin-less wrappers, clang-cl driver-mode, gcobc-15's
+#                 dangling /usr/bin/gcobol exec). rc 0 on a listed link is a
+#                 stale row and fails.
 #   Install-UX    one sid container with the built repo + real Debian
 #                 sources: per-name `apt-get -s install` legs for every
 #                 emitted regime debian name in the shard (rc 0; the candidate
@@ -262,6 +281,10 @@ if clang_here and bound is None and "clang-3.3" not in selected:
 arch = {e["name"]: e["expected_arch"] for e in catalog["packaged"]}
 arch.update({f: r["expected_arch"] for f, r in
              catalog["trunk_families"].items()})
+arch_alts = {e["name"]: e.get("expected_arch_alts", [])
+             for e in catalog["packaged"]}
+arch_alts.update({f: r.get("expected_arch_alts", [])
+                  for f, r in catalog["trunk_families"].items()})
 emachine = {r["asset"]: (r.get("analysis") or {}).get("target_emachine")
             for r in manifest["rows"].values()}
 
@@ -273,6 +296,28 @@ json.dump({"pending_total": pending_total,
            "pending_slot": len(pending_slot),
            "emit_floor": sorted(emit)}, open(f"{tmp}/floor.json", "w"))
 
+# Era policies, all in exceptions.json's cutoff section and all asserted
+# BOTH directions: a recorded link --version allowance must fire exactly
+# (rc + stderr substring), an era flag set must be BOTH necessary (the
+# plain control compile still fails) and sufficient (flags compile+run),
+# and a clang C++ policy row must match per baseline. A fix that lands
+# upstream red-marks its stale row instead of passing silently.
+era_smoke = cutoff.get("era_smoke", {})
+cxx_policy = cutoff.get("cxx_policy", {})
+link_rc = cutoff.get("link_version_rc", {})
+for n in selected:
+    b = emit[n]
+    if b["family"].startswith("clang") and not b["family"].endswith("trunk"):
+        if b["smoke"] == "L2" and n not in cxx_policy:
+            die(f"{n}: no cxx_policy row — the policy table is "
+                "non-vacuous per L2 clang bundle")
+for n, r in cxx_policy.items():
+    if n in emit and set(r.get("baselines", {})) != {"sid", "trixie"}:
+        die(f"cxx_policy row {n} does not name both baselines")
+for n, r in era_smoke.items():
+    if n in emit and r.get("version") and r["version"] != emit[n]["version"]:
+        die(f"era_smoke row for {n} tied to stale version {r['version']}")
+
 names12 = []
 for n in sorted(selected):
     b = emit[n]
@@ -283,9 +328,16 @@ for n in sorted(selected):
            "links": b["links"], "link_exclusions": b["link_exclusions"],
            "internal_sonames": b["payload_internal_sonames"],
            "expected_arch": arch.get(n) or arch.get(b["family"], ""),
+           "expected_arch_alts": (arch_alts.get(n)
+                                  or arch_alts.get(b["family"], [])),
            "target_emachine": emachine.get(b["payload"]["asset"]),
            "cutoff": limited(b),
            "refusal_signature": refusals.get(n, {}).get("signature"),
+           "era_c": era_smoke.get(n, {}).get("c_flags", []),
+           "era_cxx": era_smoke.get(n, {}).get("cxx_flags", []),
+           "era_extra": era_smoke.get(n, {}).get("extras", []),
+           "cxx_policy": cxx_policy.get(n, {}),
+           "link_rc": link_rc.get(n, {}).get("links", {}),
            "ldd_recorded": cutoff.get("ldd", {}).get(n, {}).get("files", []),
            "asset": b["payload"]["asset"],
            "size_mib": b["payload"]["size_bytes"] >> 20}
@@ -504,9 +556,24 @@ while IFS=$'\t' read -r -u 9 link target; do
     *) fail "link /usr/bin/$link -> $t, not into $PREFIX"; continue ;;
   esac
   [ -x "$t" ] || { fail "link target $t not executable"; continue; }
-  "$link" --version </dev/null >"$out/link.$link.version" 2>&1 ||
-    { fail "link $link is on PATH but --version exits rc=$?"; continue; }
-  linked=$((linked + 1))
+  rc_row=$(grep "^$link	" "$cfg/linkrc.tsv" 2>/dev/null || true)
+  lrc=0
+  "$link" --version </dev/null >"$out/link.$link.version" 2>&1 || lrc=$?
+  if [ "$lrc" -eq 0 ]; then
+    [ -z "$rc_row" ] ||
+      fail "link $link answers --version now — its allowance row is stale"
+    linked=$((linked + 1)); continue
+  fi
+  if [ -n "$rc_row" ]; then
+    want_rc=$(printf '%s' "$rc_row" | cut -f2)
+    want_sub=$(printf '%s' "$rc_row" | cut -f3-)
+    if [ "$lrc" = "$want_rc" ] &&
+       grep -qF "$want_sub" "$out/link.$link.version"; then
+      note "ok    link $link answers with its measured allowance (rc=$lrc, '$want_sub')"
+      linked=$((linked + 1)); continue
+    fi
+  fi
+  fail "link $link is on PATH but --version exits rc=$lrc"; continue
 done 9< "$cfg/links.tsv"
 [ "$iter" -eq "$planned" ] ||
   fail "link loop visited $iter of $planned rows — a body command ate the plan"
@@ -575,6 +642,17 @@ if [ "$FAMILYKIND" = clang ]; then
       echo "$rc" > "$out/rc"; exit 1; }
   note "note  HARNESS EXTRAS for $PKG: $extras (bundle Depends does not declare them; Debian's own clang-N does)"
 fi
+# Era rows can name their own harness extras (e.g. binutils: the baseline
+# ld the -B flag routes to exists only when binutils is installed, and the
+# bundle's Depends rightly do not declare it).
+era_extra=$(cat "$cfg/era_extra" 2>/dev/null || true)
+if [ -n "$era_extra" ]; then
+  apt-get install -y --no-install-recommends $era_extra \
+      >"$out/era_extra.log" 2>&1 ||
+    { fail "era harness extras ($era_extra) not installable"
+      echo "$rc" > "$out/rc"; exit 1; }
+  note "note  HARNESS EXTRAS for $PKG: $era_extra (era_smoke row; not in the bundle Depends)"
+fi
 
 if [ "$NATIVE" = 1 ]; then
   if [ "$CUTOFF" = 1 ]; then
@@ -625,10 +703,21 @@ if [ "$NATIVE" = 1 ]; then
       } > "$out/trial.facts"
     fi
   else
-    if "$CC" -O2 -o /tmp/h /tmp/hello.c 2>"$out/cc.log"; then
+    cflags=$(cat "$cfg/flags.c" 2>/dev/null || true)
+    if [ -n "$cflags" ]; then
+      # Era row present: the flags must be BOTH necessary (plain still
+      # fails) and sufficient (flags compile+run). shellcheck disable=SC2086
+      if "$CC" -O2 -o /tmp/h0 /tmp/hello.c 2>"$out/cc.control.log"; then
+        fail "era_smoke row stale: plain C unexpectedly links without $cflags"
+      else
+        note "ok    era control: plain C still fails without the era flags"
+      fi
+    fi
+    # shellcheck disable=SC2086 # policy flags are a deliberate word-split
+    if "$CC" -O2 $cflags -o /tmp/h /tmp/hello.c 2>"$out/cc.log"; then
       got=$(/tmp/h) || got="rc=$?"
       [ "$got" = "s4-c-5050" ] || fail "L1: C printed '$got'"
-      note "ok    L1: C compiles, links, runs ($got)"
+      note "ok    L1: C compiles, links, runs ($got)${cflags:+ [$cflags]}"
     else
       err=$(head -c 160 "$out/cc.log" | tr '\n' ' ')
       fail "L1: C compile+link rc=$? ($err)"
@@ -639,14 +728,26 @@ if [ "$NATIVE" = 1 ]; then
       else
         static=
         [ "$FAMILYKIND" = gcc ] && static=-static-libstdc++
-        if $CXX -O2 $static -o /tmp/hp /tmp/hello.cpp 2>"$out/cxx.log"; then
-          got=$(/tmp/hp) || got="rc=$?"
-          [ "$got" = "s4-cpp-5050" ] ||
-            fail "L2: C++ printed '$got'"
-          note "ok    L2: C++ compiles, links, runs ($got)"
+        cxxflags=$(cat "$cfg/flags.cxx" 2>/dev/null || true)
+        cxx_expected=$(cat "$cfg/cxx_expected" 2>/dev/null || true)
+        # shellcheck disable=SC2086 # static/cxxflags: deliberate word-splits
+        if $CXX -O2 $static $cxxflags -o /tmp/hp /tmp/hello.cpp 2>"$out/cxx.log"; then
+          if [ "$cxx_expected" = fail ]; then
+            fail "cxx_policy row stale: C++ unexpectedly passes on $BASE"
+          else
+            got=$(/tmp/hp) || got="rc=$?"
+            [ "$got" = "s4-cpp-5050" ] ||
+              fail "L2: C++ printed '$got'"
+            note "ok    L2: C++ compiles, links, runs ($got)"
+          fi
         else
-          err=$(head -c 160 "$out/cxx.log" | tr '\n' ' ')
-          fail "L2: C++ compile+link rc=$? ($err)"
+          if [ "$cxx_expected" = fail ]; then
+            ev=$(grep -m1 'error' "$out/cxx.log" | head -c 160)
+            note "ok    L2: C++ fails as the cxx_policy row records ($ev)"
+          else
+            err=$(head -c 160 "$out/cxx.log" | tr '\n' ' ')
+            fail "L2: C++ compile+link rc=$? ($err)"
+          fi
         fi
       fi
     fi
@@ -906,6 +1007,19 @@ if cxx:
     open(f"{d}/cxx", "w").write(cxx)
 if cfg["refusal_signature"]:
     open(f"{d}/refusal", "w").write(cfg["refusal_signature"])
+open(f"{d}/era_extra", "w").write(" ".join(cfg["era_extra"]))
+open(f"{d}/flags.c", "w").write(" ".join(cfg["era_c"]))
+open(f"{d}/flags.cxx", "w").write(" ".join(cfg["era_cxx"]))
+with open(f"{d}/linkrc.tsv", "w") as f:
+    for link, row in sorted(cfg["link_rc"].items()):
+        f.write(f"{link}\t{row['rc']}\t{row['stderr']}\n")
+cd = cfg["cxx_policy"]
+if cd and base not in cd.get("baselines", {}):
+    print(f"FAIL  {b}: cxx_policy row lists no verdict for baseline {base}",
+          file=sys.stderr)
+    sys.exit(1)
+open(f"{d}/cxx_expected", "w").write(
+    "" if not cd else ("pass" if cd["baselines"][base] else "fail"))
 
 if not native:
     def bt(tool):
@@ -925,6 +1039,7 @@ meta = {"expect": expect,
                 "links": sorted(cfg["links"].values()),
                 "exclusions": sorted(cfg["link_exclusions"])},
         "expected_arch": cfg["expected_arch"],
+        "expected_arch_alts": cfg["expected_arch_alts"],
         "target_emachine": cfg["target_emachine"],
         "smoke": cfg["smoke"], "level": level, "cutoff": cfg["cutoff"],
         "regime": cfg["regime"], "native": native,
