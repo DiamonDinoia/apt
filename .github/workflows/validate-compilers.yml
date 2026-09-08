@@ -1,12 +1,15 @@
 name: validate-compilers
 
-# S4's CI-only validation entry (E23: the runner network beats the dev box for
-# the multi-hundred-MB mirrored payloads). Dispatched by hand against a team
-# branch; test_compilers.sh is the same file the per-push/shard and scheduled
-# sweep wiring will reuse (S8b reconciles the final workflow set — until this
-# file lands on the default branch, `gh workflow run` 404s on it; on this
-# branch it was validated via a temporary push trigger, removed after the
-# green run).
+# The compiler container matrix (test_compilers.sh, D4) as the post-merge CI
+# sweep gate: full-sweep mode asserts the mirror covers every catalog payload,
+# so any payload dropping out of the mirror turns every cell red instead of
+# silently shrinking the floor. E23: the runner network beats the dev box for
+# the multi-hundred-MB mirrored payloads. Dispatched by hand for branch
+# sign-off, and scheduled weekly against main — the sweep pulls the whole
+# multi-GiB mirror floor, so daily would buy nothing over nightly's own
+# checks. The shared `repo` concurrency group serializes the sweep against
+# nightly + bulk-sync, whose mirror mutations (trunk rotations) must not race
+# the sweep's postinst payload fetches; cancel-in-progress false matches them.
 on:
   workflow_dispatch:
     inputs:
@@ -18,9 +21,17 @@ on:
         description: "comma-separated subset of sid,trixie"
         default: "sid,trixie"
         required: true
+  schedule:
+    # Weekly, after the 03:17 bulk-sync and 04:17 nightly. Schedules fire on
+    # the default branch only, so this entry is inert on team branches.
+    - cron: "17 7 * * 0"
 
 permissions:
   contents: read
+
+concurrency:
+  group: repo
+  cancel-in-progress: false
 
 jobs:
   plan:
@@ -40,8 +51,8 @@ jobs:
       - id: plan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # The || fallbacks make the file safe under the non-dispatch
-          # triggers S8b adds later (push/schedule carry no inputs).
+          # The || fallbacks make the file safe under the schedule trigger
+          # (schedules carry no inputs).
           SHARD_N: ${{ inputs.shards || '4' }}
           BASELINES: ${{ inputs.baselines || 'sid,trixie' }}
         run: |
@@ -80,6 +91,11 @@ jobs:
                   empty.append(i)
           matrix = {"include": [{"baseline": b, "shard": f"{i}/{n}"}
                                 for b in baselines for i in slots]}
+          # An empty matrix must not pass: a matrix job over zero configs is
+          # a silent green that tested nothing (D4). emit keys are catalog
+          # entry names, so emit non-empty above implies slots non-empty;
+          # this assert is what fails degenerate baselines input too.
+          assert matrix["include"], "planned matrix is empty — nothing would run"
           print(f"slots dispatched: {slots}; empty slots skipped: {empty}")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write("matrix=" + json.dumps(matrix) + "\n")

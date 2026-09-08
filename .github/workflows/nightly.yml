@@ -140,8 +140,12 @@ jobs:
 
       # Everything above tests out/ on this runner. Only this step fetches the
       # index a user fetches, which is where a name the release host rewrote
-      # turns into a 404 that nothing else can see.
-      - name: Install from the published repository and check the handover
+      # turns into a 404 that nothing else can see. The script is the shrunk
+      # published-path harness (S5): released bootstrap install + byte-pinned
+      # upgrade, links from --dump-spec, then the payload compile battery.
+      # The distro-precedence half moved to test_precedence.sh, which
+      # validate-precedence.yml runs.
+      - name: Install from the published repository and run the compile battery
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./test_gcc17.sh
