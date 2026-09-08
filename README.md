@@ -307,7 +307,7 @@ spellings clang has shipped, backports), and
 per-suite corpus with `dpkg --compare-versions`, failing the build on a
 violation. Nightlies keep `<major>~trunk<date>`, which sits below the same
 corpus forms. Two sorts of names exist beside the Debian-shaped ones:
-families Debian ships only unversioned (`gcc-avr` — we spell `gcc-13-avr`),
+families Debian ships only unversioned (`gcc-avr` — spelled here `gcc-13-avr`),
 and families with no Debian analog at all (`gcc-12-vax`, `gcc-7-k1`). All of
 them carry the same `~ce` discipline.
 
@@ -317,7 +317,7 @@ the archive can spell. Where Debian ships the name today, apt resolves the
 distribution's package — `apt install gcc-16` never touches this repository's
 one. Where only this repository ships the name, the bundle installs at 100 and
 fills the gap until Debian starts shipping the name, after which an upgrade
-swaps ours out in one transaction. `apt` will not downgrade across priorities,
+swaps the bundle out in one transaction. `apt` will not downgrade across priorities,
 so neither half alone suffices: a higher pin on Debian's side does not displace
 an installed package whose version is higher, and a low version without the
 pin would still win on the 500 a new Debian upload carries. Both halves are
@@ -333,9 +333,10 @@ that must reverse every outcome or the regime assertions prove nothing.
 
 Install UX follows from the same rules, and `test_compilers.sh` asserts it on
 the real built repository rather than describing it. Installing any emitted
-name on its own resolves cleanly; under the wide globs `gcc-*` / `clang-*` our
-bundles lawfully join the solution set where only we ship a name, and apt never
-reports one of our versions as a conflict party there. The exception is the
+name on its own resolves cleanly; under the wide globs `gcc-*` / `clang-*`
+this repository's bundles lawfully join the solution set where only this
+repository ships a name, and apt never reports one of its versions as a
+conflict party there. The exception is the
 unversioned-analog families: every series of one claims the same unversioned
 Debian name (`gcc-13-avr` and `gcc-16-avr` both carry `Provides/Conflicts:
 gcc-avr`), so the series install together no better than their Debian shapes
