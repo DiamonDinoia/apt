@@ -180,8 +180,8 @@ def resolve(name: str, spec: dict) -> dict:
                     _RELEASES[endpoint] = json.load(r)
             except urllib.error.HTTPError as e:
                 raise SystemExit(f"{name}: {endpoint} returned {e.code}"
-                                 + (f"; run mirror.sh to populate the {spec['tag']!r} "
-                                    "release" if "tag" in spec else "")) from None
+                                 + (f"; populate the {spec['tag']!r} release first"
+                                    if "tag" in spec else "")) from None
         release = _RELEASES[endpoint]
         rx = re.compile(spec["asset"])
         matches = [a for a in release["assets"] if rx.match(a["name"])]
