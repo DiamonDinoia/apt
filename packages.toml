@@ -221,6 +221,9 @@ repo = "DiamonDinoia/juno-drivers-debian"
 tag = "builds"
 asset = '^clevo-keyboard-dkms_[^_]+_amd64\.deb$'
 version_re = '^clevo-keyboard-dkms_([^_]+)_amd64\.deb$'
+# Depends: juno-drivers-diamon since 0.5.48.2+diamon10, so the lone install
+# needs Juno's repository for juno-info, like juno-drivers-diamon itself.
+with = ["diamondinoia-repo-juno"]
 description = "Clevo keyboard/backlight driver (dkms) for Juno laptops, forked build"
 homepage = "https://github.com/DiamonDinoia/juno-drivers-debian"
 
@@ -237,6 +240,9 @@ repo = "DiamonDinoia/juno-kde-fancontrol"
 tag = "builds"
 asset = '^juno-kde-fancontrol_[^_]+_amd64\.deb$'
 version_re = '^juno-kde-fancontrol_([^_]+)_amd64\.deb$'
+# Depends: juno-drivers-diamon since 0.6.3+diamon4, so the lone install
+# needs Juno's repository for juno-info, like juno-drivers-diamon itself.
+with = ["diamondinoia-repo-juno"]
 description = "fan control and system monitor for Juno (Clevo) laptops"
 homepage = "https://github.com/DiamonDinoia/juno-kde-fancontrol"
 
@@ -252,6 +258,9 @@ repo = "DiamonDinoia/ec-sys-dkms"
 tag = "builds"
 asset = '^ec-sys-dkms_[^_]+_amd64\.deb$'
 version_re = '^ec-sys-dkms_([^_]+)_amd64\.deb$'
+# Depends: juno-drivers-diamon since 1.0+diamon1, so the lone install
+# needs Juno's repository for juno-info, like juno-drivers-diamon itself.
+with = ["diamondinoia-repo-juno"]
 description = "ec_sys ACPI embedded controller debugfs module (dkms) for Juno laptops, forked build"
 homepage = "https://github.com/DiamonDinoia/ec-sys-dkms"
 
