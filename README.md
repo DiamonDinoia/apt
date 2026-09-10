@@ -48,7 +48,7 @@ provide, so it can never shadow Debian:
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
-    Package: clevo-keyboard-dkms juno-drivers-diamon juno-kde-fancontrol
+    Package: clevo-keyboard-dkms ec-sys-dkms juno-drivers-diamon juno-kde-fancontrol
     Pin: release l=diamondinoia
     Pin-Priority: 500
 
@@ -447,8 +447,10 @@ a fork that carries local fixes on top of Juno's packaging. The fork's CI
 builds the `.deb`, installs it in a clean `debian:sid` container (starting from
 Juno's own packages, to prove the swap), and publishes it as an asset of its
 `builds` release. The same shape covers the fork-built `clevo-keyboard-dkms`
-payload and the fan-control package from
-[DiamonDinoia/juno-kde-fancontrol](https://github.com/DiamonDinoia/juno-kde-fancontrol).
+payload, the fan-control package from
+[DiamonDinoia/juno-kde-fancontrol](https://github.com/DiamonDinoia/juno-kde-fancontrol)
+and the `ec_sys` module from
+[DiamonDinoia/ec-sys-dkms](https://github.com/DiamonDinoia/ec-sys-dkms).
 
 The wrapper shapes would drop the maintainer scripts that do the real work, so
 this package serves that `.deb` itself, bit-identical: `packages.toml` resolves
