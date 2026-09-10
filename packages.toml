@@ -240,6 +240,21 @@ version_re = '^juno-kde-fancontrol_([^_]+)_amd64\.deb$'
 description = "fan control and system monitor for Juno (Clevo) laptops"
 homepage = "https://github.com/DiamonDinoia/juno-kde-fancontrol"
 
+# ec_sys ACPI embedded controller debugfs module for the same laptops, from
+# DiamonDinoia/ec-sys-dkms, whose CI builds the deb through the same container
+# gate (dh_dkms install, module build/load verification) and attaches it to
+# its `builds` release. Passthrough for the same reason as the other three:
+# the dh_dkms maintainer scripts are the package, so the deb is served
+# bit-identical, pinned to the digest GitHub reports.
+[ec-sys-dkms]
+install = "passthrough"
+repo = "DiamonDinoia/ec-sys-dkms"
+tag = "builds"
+asset = '^ec-sys-dkms_[^_]+_amd64\.deb$'
+version_re = '^ec-sys-dkms_([^_]+)_amd64\.deb$'
+description = "ec_sys ACPI embedded controller debugfs module (dkms) for Juno laptops, forked build"
+homepage = "https://github.com/DiamonDinoia/ec-sys-dkms"
+
 # Compiler payloads (gcc/clang stables and trunk families) are not listed
 # here: build.py derives one bundle per catalog.json entry from the recorded
 # Debian naming shapes and mirror-manifest.json's per-payload analysis. The
