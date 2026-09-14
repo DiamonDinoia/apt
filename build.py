@@ -346,6 +346,9 @@ fi
 {link_checks}
 rm -rf {prefix}
 mv "$staging" {prefix}
+# mktemp staged the tree with mode 0700 and the rename kept it; left that way
+# every launcher link into the prefix dangles for anyone but root.
+chmod 0755 {prefix}
 trap 'rm -rf "$tmp"' EXIT
 {links}""",
 }

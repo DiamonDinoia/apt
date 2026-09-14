@@ -332,6 +332,12 @@ for pkg in $WANT; do
             printf 'FAIL  %-18s launcher %s is not executable\n' "$pkg" "$target"
             rc=1; continue
         fi
+        # Root traverses any prefix; only the mode tells whether a user can.
+        if (( (8#$(stat -c %a "/opt/$pkg") & 5) != 5 )); then
+            printf 'FAIL  %-18s /opt/%s not world-enterable (mode %s)\n' \
+                "$pkg" "$pkg" "$(stat -c %a "/opt/$pkg")"
+            rc=1; continue
+        fi
         what="$(du -sh "/opt/$pkg" | cut -f1) in /opt/$pkg -> ${target#/opt/$pkg/}"
     else
         printf 'FAIL  %-18s installed nothing\n' "$pkg"; rc=1; continue
