@@ -145,7 +145,8 @@ license = "Apache-2.0"
 [difftastic]
 install = "member"
 repo = "Wilfred/difftastic"
-asset = '^difft-x86_64-unknown-linux-gnu\.tar\.gz$'
+asset = '^difft-[0-9.]+-x86_64-unknown-linux-gnu\.tar\.gz$'
+version_re = '^difft-([0-9.]+)-x86_64-unknown-linux-gnu\.tar\.gz$'
 member = "difft"
 binary = "difft"
 description = "Structural diff that understands syntax"
