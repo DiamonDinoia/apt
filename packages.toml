@@ -264,6 +264,22 @@ with = ["diamondinoia-repo-juno"]
 description = "ec_sys ACPI embedded controller debugfs module (dkms) for Juno laptops, forked build"
 homepage = "https://github.com/DiamonDinoia/ec-sys-dkms"
 
+# Clevo/Juno EC fan control dkms module for the same laptops, from
+# DiamonDinoia/clevofan, whose CI builds the deb through the same dh_dkms
+# container gate and attaches it to its `builds` release. Passthrough for the
+# same reason as the other three: the dh_dkms maintainer scripts are the
+# package, so the deb is served bit-identical, pinned to the digest GitHub
+# reports. Deposes Juno's unpatched clevofan-dkms; adds ec_transaction
+# serialization.
+[clevofan-dkms]
+install = "passthrough"
+repo = "DiamonDinoia/clevofan"
+tag = "builds"
+asset = '^clevofan-dkms_[^_]+_amd64\.deb$'
+version_re = '^clevofan-dkms_([^_]+)_amd64\.deb$'
+description = "Clevo/Juno EC fan control module (dkms), ec_transaction-serialized, forked build"
+homepage = "https://github.com/DiamonDinoia/clevofan"
+
 # Compiler payloads (gcc/clang stables and trunk families) are not listed
 # here: build.py derives one bundle per catalog.json entry from the recorded
 # Debian naming shapes and mirror-manifest.json's per-payload analysis. The
