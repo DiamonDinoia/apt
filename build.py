@@ -1841,20 +1841,23 @@ def index() -> None:
              "release", "."],
             cwd=OUT, stdout=f)
     # apt-ftparchive stamps the wall clock into Date: (apt 3.3 does not honour
-    # SOURCE_DATE_EPOCH, measured). Rewrite it so a rebuild over unchanged
-    # inputs yields unchanged bytes; the signature below covers the result.
-    # The pinned instant is the signing key's creation time: fixed for the
-    # life of the key, and gpg refuses to sign earlier than the key exists
-    # (epoch-0 fails a freshly generated key).
+    # SOURCE_DATE_EPOCH, measured). Keep it: clients treat an older Date as a
+    # rollback and silently keep their cached index, so a pinned Date freezes
+    # every client that ever fetched a newer one (measured: pinning the stamp
+    # to the key creation froze all clients on the last wall-clock nightly).
+    # SOURCE_DATE_EPOCH wins when set nonzero, for tests; the floor is the
+    # key's creation time because gpg refuses to sign earlier than the key
+    # exists (line 136 defaults SDE to "0", which selects the wall clock).
+    stamp_epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0")) \
+        or int(time.time())
     key = os.environ.get("GPG_KEY_ID")
     if key:
         out = subprocess.run(["gpg", "--batch", "--list-keys",
                               "--with-colons", key],
                              capture_output=True, text=True, check=True).stdout
-        stamp_epoch = next(int(l.split(":")[5]) for l in out.splitlines()
-                           if l.startswith("pub:"))
-    else:
-        stamp_epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
+        key_epoch = next(int(l.split(":")[5]) for l in out.splitlines()
+                         if l.startswith("pub:"))
+        stamp_epoch = max(stamp_epoch, key_epoch)
     stamp = time.strftime("%a, %d %b %Y %H:%M:%S +0000",
                           time.gmtime(stamp_epoch))
     release = OUT / "Release"
@@ -1866,7 +1869,7 @@ def index() -> None:
     if not key:
         print("GPG_KEY_ID unset, leaving the index unsigned")
         return
-    # Signatures carry a creation time; pin it the same way for byte-stability.
+    # The signature's creation time matches the rewritten Date:.
     faked = ["--faked-system-time", str(stamp_epoch)]
     run(["gpg", "--batch", "--yes", "--default-key", key, *faked,
          "--clearsign", "-o", "InRelease", "Release"], cwd=OUT)
