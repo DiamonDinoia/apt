@@ -284,11 +284,16 @@ immutable: 222 catalog payloads (the latest point release of every in-scope
 series, native and cross) are mirrored once, and a later size or ETag change
 upstream is an alarm — `mirror.py check` exits 1 naming it and nothing
 re-mirrors or self-heals a stable. Nightlies rotate: 9 trunk families (native
-`gcc`/`clang` and seven cross) keep exactly the newest two dated assets per
-family, a new date re-records the row without alarm, and rows orphaned by an
-outside rotation are reaped rather than alarmed, because for this class a
-vanished asset is the design, not drift. That is 238 mirrored payloads,
-roughly 46 GiB.
+`gcc`/`clang` and seven cross) delete a dated asset only when the published
+Packages index was fetched and verified against the Release file's size and
+SHA-256 for it, no package in it names the asset, it is at least 14 days old,
+and it is not the newest dated asset of its class in its family (the renamed
+payloads and the raw dated leftovers protect their own newest each, so a
+newer raw leftover never makes the newest build-consumed payload deletable);
+an index that cannot be
+fetched or verified prunes nothing that run. Rows orphaned by an
+outside rotation are reaped rather than alarmed: rotation of this class is
+the design.
 
 Each catalog entry and each trunk family's newest row becomes one bundle deb:
 231 emitted today. A bundle's postinst fetches the payload from the `mirror`
@@ -431,12 +436,24 @@ the stable alarm above. A nightly family bumps in stride: the major is probed
 out of each payload (`lib/gcc/<target>/<version>/` for GCC, `lib/clang/<major>/`
 for Clang) and the asset is renamed to match, so the name can never lie about
 the compiler inside it. The day GCC's master becomes 18, that night's upload
-probes 18, the rotate keeps the newest two dated assets of the family, and the
-emitted bundle's name and version follow the probe — `gcc-17` stops being
+probes 18, and that night's upload stays under the one retention rule:
+a dated payload is deleted only when the published Packages index was
+fetched and verified against the Release file's size and SHA-256, no
+package in it names the payload, it is at least 14 days old, and it is not
+the newest dated asset of its class in its family (renamed and raw each
+protect their own newest); an index failure deletes nothing.
+A family whose upstream dated keys cannot be listed that run is skipped
+for pruning: its dated assets enter neither the dry-run plan nor the
+deletions, and a misspelled selector fails before any planning, in
+dry-run too. Assets that never finished uploading (state other than
+"uploaded") are not published payloads: they are corrupt leftovers and
+are still removed, whatever the family's listing said.
+The emitted bundle's name and version follow
+the probe — `gcc-17` stops being
 offered while the name's installed copies simply keep running, since apt has
-no rename, and `gcc-18` is the name that now tracks trunk. Keep-two is the
-whole retention for nightlies; stables are never pruned, because the series
-they mirror does not rotate.
+no rename, and `gcc-18` is the name that now tracks trunk. That
+referenced-and-old rule is the whole retention for nightlies; stables are
+never pruned, because the series they mirror does not rotate.
 
 ## The exception: juno-drivers-diamon
 
