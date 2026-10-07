@@ -44,8 +44,9 @@ jobs:
 
       # One download from the publisher per new version, ever; users and tests
       # get the payload from the mirror release here. mirror.py rotates new
-      # dated trunk nightlies into the release (keep-newest-two, catalog
-      # rename schemes), pacing its GitHub calls; --max 4 covers a normal
+      # dated trunk nightlies into the release (deletes a dated payload only when
+      # no package in the live published index names it and it is older than 14
+      # days), pacing its GitHub calls; --max 4 covers a normal
       # day's rotations.
       - name: Mirror the nightly payloads
         env:

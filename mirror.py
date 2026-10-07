@@ -9,9 +9,10 @@ pays for its own S3 egress, which is the whole reason this file exists.
 
 Modes and exit codes (S8's workflows map onto this contract):
 
-  sync [--max N] [payload ...]
+  sync [--max N] [--dry-run] [payload ...]
       Mutating. Per trunk family: ghost cleanup, legacy adoption,
       reconciliation, rotation, pruning; then the same for stables.
+      --dry-run prints the pruning plan and deletes nothing.
       Rotations to unseen dates and selector-named first pulls are the
       "new payloads" and --max N caps their CE downloads per run
       (default: unlimited). Reconciliation re-downloads of assets the
@@ -63,8 +64,8 @@ the single-release GET, so no pagination path exists here).
 
 Stables are immutable upstream: sha256+size+ETag are recorded at first
 sync; later size/ETag drift is an exit-1 alarm, never an auto re-mirror.
-Trunks rotate per family, keep-newest-two (mirror.sh precedent), asset
-renamed per catalog.trunk_families[f].rename with the major probed from
+Trunks rotate per family, asset renamed per
+catalog.trunk_families[f].rename with the major probed from
 the payload: gcc via lib/gcc/<target>/<ver>/, clang via
 lib/clang/<major>/ (measured: lib/clang/24/ in the clang-trunk
 payload). Matching of family members and extraction of {date}/{major}
@@ -72,14 +73,19 @@ goes through the family's OWN rename regex (named groups) — never a
 positional or end-anchored date guess: 6 of the 9 rename schemes put
 the triplet/arch after the date, where a date-anchored-at-end match
 finds nothing and crashes (attempt 1, defect A). A new date
-re-records the row without alarm; dated assets beyond the newest two
-are pruned together with their manifest rows (404 on delete tolerated);
-rows naming assets an external pass already pruned (the mirror.sh-era
-nightly keeps its own window on main) are reaped the same way at the
-family pass — rotation never alarms, stables never reap;
-undated `<family>-<8digits>.tar.xz` assets on the release are
-pre-rename leftovers and are dropped (mirror.sh precedent). The
-keep-two accounting spans the whole renamed namespace of a family:
+re-records the row without alarm; a dated payload is deleted only when
+the published Packages index was fetched and verified against the
+Release file's size and SHA256 for it, no package names it, it is
+older than 14 days, and it is not the newest of its class in its
+family; any doubt deletes nothing (fail safe). Raw dated leftovers
+(mirror.sh-era `<family>-<8digits>.tar.xz`) follow this same rule as
+renamed payloads; the renamed class and the raw class each protect
+their own newest independently (the current build pins the newest
+renamed payload before publication can name it).
+Rows naming assets an external pass already pruned (the
+mirror.sh-era nightly keeps its own window on main) are reaped at the
+family pass — rotation never alarms, stables never reap. Retention
+spans the whole renamed namespace of a family:
 every asset matching the family's rename regex counts, whatever major
 it carries. Release assets whose state is not "uploaded" are corrupt
 leftovers (treated as absent for coverage, deleted during sync — they
@@ -151,6 +157,7 @@ stdlib only. Supersedes mirror.sh.
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import io
 import json
@@ -180,8 +187,13 @@ S3_NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
 UA = {"User-Agent": "diamondinoia-apt mirror"}
 
 PACE_SECONDS = 7.5   # between any two mutating GitHub calls
-KEEP_DATED = 2       # newest dated assets kept per trunk family
+KEEP_DAYS = 14      # dated assets younger than this are never pruned
 TIMEOUT = 300
+
+INDEX_URL = (f"https://github.com/{REPO}/releases/download/repo/")
+# build.py's index() writes the `repo` release: Packages plus a Release
+# file whose SHA256 stanza carries the Packages size and hash — the
+# integrity metadata the prune's index fetch is verified against.
 
 # The only auto-adopted names: mirror.sh uploaded these two with no
 # committed ground truth. Everything else with no manifest row is
@@ -579,28 +591,131 @@ def dated_prefix_listing(family: str) -> dict[str, str]:
     return out
 
 
+def referenced_payloads(text: str) -> set[str]:
+    """Payload asset names the published Packages index names. The deb
+    stanzas carry the pinned payload asset in the Description field, so a
+    scan for .tar.xz tokens is the full set prune must never delete. Call
+    it only on an index fetch_referenced_payloads verified."""
+    return set(re.findall(r"[A-Za-z0-9][A-Za-z0-9._+~-]*\.tar\.xz", text))
+
+
+def fetch_referenced_payloads(base: str = INDEX_URL,
+                              opener=urllib.request.urlopen) -> set[str] | None:
+    """Live published index's referenced payloads; None on any failure
+    (callers fail safe: prune nothing that run). The `repo` release's
+    Release file carries the size and SHA256 of Packages: Packages is
+    trusted only when its bytes match both, so a truncated, corrupt or
+    swapped body can never arm a prune. One exception net covers both
+    fetches (Exception covers URLError, HTTPError, IncompleteRead,
+    ValueError, UnicodeDecodeError)."""
+    def get(suffix: str) -> bytes:
+        with opener(urllib.request.Request(base + suffix, headers=UA),
+                    timeout=TIMEOUT) as r:
+            return r.read()
+    try:
+        rel = get("Release").decode("utf-8")
+        m = re.search(r"(?m)^SHA256:\n((?: .+\n)+)", rel)
+        if m is None:
+            raise ValueError("no SHA256 section in Release")
+        m2 = re.search(r"(?m)^ ([0-9a-f]{64}) +(\d+) +Packages$", m.group(1))
+        if m2 is None:
+            raise ValueError("no SHA256 entry for Packages in Release")
+        expected_sha, expected_size = m2.group(1), int(m2.group(2))
+        raw = get("Packages")
+        if len(raw) != expected_size:
+            raise ValueError(f"Packages is {len(raw)} bytes, Release says "
+                             f"{expected_size}")
+        if hashlib.sha256(raw).hexdigest() != expected_sha:
+            raise ValueError("Packages SHA256 does not match Release")
+        return referenced_payloads(raw.decode("utf-8"))
+    except Exception as e:
+        print(f"prune: cannot fetch and verify the published index {base}: "
+              f"{e}; deleting nothing this run", file=sys.stderr)
+        return None
+
+
 def prune_plan(dated_assets: list[str], rx: re.Pattern,
-               keep: int = KEEP_DATED) -> list[str]:
-    """Release asset names of one family beyond the newest `keep`, oldest
-    first. Each asset's date comes from the FAMILY's rename regex named
-    group — never a positional/end-anchored guess: 6 of the 9 schemes
-    carry text after the date, where an anchored guess finds nothing.
-    Every member must match rx: a foreign asset in the plan is a caller
-    bug and must fail loudly."""
+               referenced: set[str], today: str,
+               keep_names: set[str] | None = None,
+               keep_days: int = KEEP_DAYS) -> list[str]:
+    """Release asset names of one family that may be deleted, oldest first.
+    An asset is deleted only when the verified published Packages index
+    does not name it, it is at least `keep_days` old, and it is not in
+    `keep_names` (the family's newest asset: the current build pins it
+    before publication can name it). Dates are yyyymmdd, so string
+    arithmetic orders them. Each asset's date comes from the FAMILY's
+    rename regex named group — never a positional/end-anchored guess: 6
+    of the 9 schemes carry text after the date, where an anchored guess
+    finds nothing. Every member must match rx: a foreign asset in the
+    plan is a caller bug and must fail loudly."""
+    keep = keep_names or set()
     def dateof(name: str) -> str:
         m = rx.match(name)
         if not m:
             raise ValueError(f"prune plan got {name!r}, not in scheme {rx.pattern!r}")
         return m["date"]
-    dated = sorted(dated_assets, key=dateof)
-    return dated[: max(0, len(dated) - keep)]
+    # The family/scheme match runs before any keep short-circuit: a
+    # foreign name is a caller bug and must fail loudly even when
+    # referenced or keep_names would have protected it.
+    for n in dated_assets:
+        dateof(n)
+    cutoff = (datetime.date(int(today[:4]), int(today[4:6]), int(today[6:8]))
+              - datetime.timedelta(days=keep_days)).strftime("%Y%m%d")
+    return sorted((n for n in dated_assets
+                   if n not in referenced and n not in keep
+                   and dateof(n) <= cutoff),
+                  key=dateof)
+
+
+def build_prune_plan(catalog: dict, uploaded: dict, referenced: set[str],
+                     today: str,
+                     live_dates: dict[str, dict]) -> dict[str, list[str]]:
+    """Family -> asset names deletion may take, from one verified index
+    read. The ONE plan `sync --dry-run` prints and normal sync executes,
+    so the two can never disagree. The newest dated asset of each class of
+    each family (the renamed class, which the build consumes, and the raw
+    dated leftovers) is never planned away: the current build pins the
+    newest renamed payload before publication can name it. Caller never
+    passes referenced=None: an unread index deletes nothing. A family
+    absent from live_dates (no dated keys upstream this run) is skipped:
+    its sync pass errored and prunes nothing, so the plan must not name
+    it either."""
+    plan: dict[str, list[str]] = {}
+    for fam in sorted(catalog["trunk_families"]):
+        if fam not in live_dates:
+            continue
+        rec = catalog["trunk_families"][fam]
+        rx = rename_regex(rec["rename"])
+        raw_rx = re.compile("^" + re.escape(fam) + r"-(?P<date>\d{8})\.tar\.xz$")
+        dated = [n for n in uploaded if rx.match(n)]
+        raw = [n for n in uploaded if raw_rx.match(n)]
+        # Every asset at its class's max date is protected, whatever its
+        # age and whether the index names it. The renamed class (the one
+        # the build consumes) and the raw class protect independently: a
+        # newer raw leftover must not leave the newest RENAMED payload
+        # deletable.
+        keep = set()
+        for names in (dated, raw):
+            if names:
+                newest = max((rx.match(m) or raw_rx.match(m))["date"]
+                             for m in names)
+                keep |= {n for n in names
+                         if (rx.match(n) or raw_rx.match(n))["date"]
+                         == newest}
+        drops = prune_plan(dated, rx, referenced, today, keep_names=keep)
+        # Raw dated leftovers (mirror.sh-era <family>-<yyyymmdd>) answer to
+        # the same rule: index verified, unnamed, old, not its class newest.
+        drops += prune_plan(raw, raw_rx, referenced, today, keep_names=keep)
+        plan[fam] = sorted(drops)
+    return plan
 
 
 def reap_orphaned_trunk_rows(rows: dict, fam: str, uploaded: dict) -> list[str]:
     """Drop one nightly family's rows whose asset already left the release.
 
-    Keep-two pruning deletes the oldest dated asset together with its
-    rows, but only when THIS process does the pruning. When another pass
+    Retention pruning deletes a dated asset and its rows only when no
+    package in the live published index names it and it is older than
+    14 days, and only when THIS process does the pruning. When another pass
     pruned first (the mirror.sh-era nightly on main still slides its own
     window, or an interrupted run died between the delete and its manifest
     commit), this copy's rows still name the gone assets and nothing else
@@ -790,7 +905,8 @@ def verify_release_bytes(name: str, uploaded_asset: dict, sha: str,
             f"{uploaded_asset['size']} B); the release holds unvouched bytes")
 
 
-def cmd_sync(max_downloads: int | None, selectors: list[str]) -> int:
+def cmd_sync(max_downloads: int | None, selectors: list[str],
+             dry_run: bool = False) -> int:
     catalog = json.loads(CATALOG.read_text())
     manifest = load_manifest()
     rows = manifest["rows"]
@@ -798,24 +914,72 @@ def cmd_sync(max_downloads: int | None, selectors: list[str]) -> int:
     budget = [max_downloads if max_downloads is not None else 1 << 30]
     downloaded = [0]
 
-    release = get_release(REPO, RELEASE)
-    if release is None:
-        print(f"release {RELEASE!r} does not exist; creating it")
-        release = release_create(REPO, RELEASE)
-    uploaded, ghosts = split_assets(release)
-    release_id = release["id"]
-
-    for g in ghosts:
-        print(f"ghost asset {g['name']} (state {g.get('state')}): deleting, it "
-              "is a corrupt leftover that would 422 a re-upload")
-        delete_asset(g["id"], g["name"])
-
     known_selectors = {e["asset"] for e in catalog["packaged"]}
     for s in selectors:
         if s not in known_selectors and s not in catalog["trunk_families"]:
             print(f"FAIL  selector {s!r} is neither a catalog payload asset "
                   "nor a trunk family", file=sys.stderr)
             return 1
+
+    release = get_release(REPO, RELEASE)
+    if release is None and not dry_run:
+        print(f"release {RELEASE!r} does not exist; creating it")
+        release = release_create(REPO, RELEASE)
+    uploaded, ghosts = split_assets(release)
+    release_id = release["id"] if release else 0
+
+    # Prune needs the live published index, fetched and verified against
+    # the Release file once per run; any failure returns None and prunes
+    # nothing (fail safe).
+    referenced = fetch_referenced_payloads()
+    # datetime is a module-global so the selftest can freeze today.
+    today = datetime.date.today().strftime("%Y%m%d")
+    # A family with no live dated keys upstream errors out of its sync
+    # pass before pruning runs; its assets must not enter the plan
+    # either, or dry-run would name a deletion live sync never makes. A
+    # listing that fails marks the family not-live: doubt prunes nothing.
+    listing_failed = [False]
+    def safe_dated_prefix_listing(fam: str) -> dict[str, str]:
+        try:
+            keys = dated_prefix_listing(fam)
+        except Exception as e:
+            print(f"{fam}: cannot list upstream dated keys: {e}; "
+                  "planning no deletions for it", file=sys.stderr)
+            listing_failed[0] = True
+            return {}
+        if not keys:
+            # Same condition live sync errors on ("no live dated keys
+            # upstream"): an empty listing must fail dry-run too.
+            print(f"{fam}: no live dated keys upstream", file=sys.stderr)
+            listing_failed[0] = True
+        return keys
+    live_dates = {fam: keys
+                  for fam in catalog["trunk_families"]
+                  if (keys := safe_dated_prefix_listing(fam))}
+    plan = build_prune_plan(catalog, uploaded, referenced, today,
+                            live_dates) if referenced is not None else {}
+
+    if dry_run:
+        # Read-only: print the plan normal sync would execute and exit
+        # before any mutating call (no ghosts, no reconciliation, no
+        # rotation, no deletes, no release creation — the create is
+        # guarded above). Same planning function, same gates: the two can
+        # never disagree. referenced None (fetch failure) prints nothing:
+        # that run would prune nothing. A listing failure is the error
+        # live sync reports; dry-run exits with the same status for it.
+        if release is None:
+            print(f"release {RELEASE!r} does not exist; dry-run plans "
+                  "against an empty release")
+        for fam in sorted(plan):
+            for n in plan[fam]:
+                print(f"{fam}: would prune {n}")
+        return 1 if listing_failed[0] else 0
+
+
+    for g in ghosts:
+        print(f"ghost asset {g['name']} (state {g.get('state')}): deleting, it "
+              "is a corrupt leftover that would 422 a re-upload")
+        delete_asset(g["id"], g["name"])
 
     def budgeted_pull(key: str) -> tuple[Path, str, object] | None:
         """Download a NEW payload, honouring selectors and --max. None =
@@ -851,7 +1015,7 @@ def cmd_sync(max_downloads: int | None, selectors: list[str]) -> int:
     for fam in sorted(catalog["trunk_families"]):
         rec = catalog["trunk_families"][fam]
         rx = rename_regex(rec["rename"])
-        latest = dated_prefix_listing(fam)
+        latest = live_dates.get(fam) or {}
         if not latest:
             errors.append(f"{fam}: no live dated keys upstream")
             continue
@@ -948,13 +1112,15 @@ def cmd_sync(max_downloads: int | None, selectors: list[str]) -> int:
                 finally:
                     td.cleanup()
 
-        # Keep newest two across the whole renamed namespace of the family;
-        # undated leftovers are pre-rename junk (mirror.sh precedent).
-        fam_now = sorted(n for n in uploaded if rx.match(n))
-        drops = prune_plan(fam_now, rx) if len(fam_now) > KEEP_DATED else []
-        drops += [n for n in uploaded
-                  if re.fullmatch(re.escape(fam) + RAW_KEY_RE, n)]
-        for n in drops:
+        # Prune executes exactly the plan computed at the top of the run,
+        # after rotation has uploaded and recorded any new payload. The
+        # just-uploaded asset is absent from the plan: the plan was built
+        # on the pre-rotation release state, and the newest-per-family
+        # guard protected the previous newest. An unreadable index gave
+        # an empty plan: nothing is deleted. A family with no live dated
+        # keys upstream errored above and is absent from the plan; its
+        # assets are untouched this run.
+        for n in plan.get(fam, []):
             if n not in uploaded:
                 continue
             print(f"{fam}: pruning {n}")
@@ -1319,42 +1485,454 @@ def cmd_selftest() -> int:
            reap_orphaned_trunk_rows(rows_reap, "gcc-trunk", up) == []
            and "gcc-16.2.0.tar.xz" in rows_reap)
 
-    # ---------------- prune keep-two over EVERY family's rename scheme
-    # (defect A control: date and major always come out of the family's own
-    # regex named groups; 6 of 9 schemes put text after the date)
+    # ---------------- prune: referenced + age rules over EVERY family's
+    # rename scheme (defect A control: date and major always come out of
+    # the family's own regex named groups; 6 of 9 schemes put text after
+    # the date)
     families = catalog["trunk_families"]
     expect("catalog carries the nine trunk families", len(families) == 9,
            str(sorted(families)))
     ok_all = True
     for fam, frec in sorted(families.items()):
         rx = rename_regex(frec["rename"])
-        assets = [rename_render(frec["rename"], 16, "20260901"),
-                  rename_render(frec["rename"], 17, "20260902"),
+        assets = [rename_render(frec["rename"], 16, "20260820"),
+                  rename_render(frec["rename"], 17, "20260822"),
                   rename_render(frec["rename"], 17, "20260903"),
                   rename_render(frec["rename"], 17, "20260904")]
-        plan = prune_plan(assets, rx)
+        # today - 14 days = 20260822: the first two are old enough to
+        # prune, but the oldest is named by the index, so it survives.
+        plan = prune_plan(assets, rx, referenced={assets[0]},
+                          today="20260905")
         keep = [a for a in assets if a not in plan]
-        if not (plan == [assets[0], assets[1]] and keep == [assets[2], assets[3]]):
+        if not (plan == [assets[1]] and
+                keep == [assets[0], assets[2], assets[3]]):
             ok_all = False
             print(f"  prune mismatch {fam}: plan={plan}")
-        # trailing-date form must match too (legacy spelling of native/gcc)
-    expect("keep-two prune correct over all 9 rename schemes", ok_all)
+    expect("referenced-payload and age prune correct over all 9 rename "
+           "schemes", ok_all)
 
-    # trailing-date legacy names: same family, mixed majors, newest two kept
+    # an old payload named by the index survives; an old unnamed one is
+    # deleted; an unnamed one younger than 14 days survives
     gcc_rx = rename_regex(families["gcc-trunk"]["rename"])
-    mixed = ["gcc-16-trunk20260901.tar.xz", "gcc-17-trunk20260904.tar.xz",
-             "gcc-17-trunk20260903.tar.xz", "gcc-17-trunk20260902.tar.xz"]
-    plan = prune_plan(mixed, gcc_rx)
-    expect("prune spans majors within the scheme (keep-two by date)",
-           plan == ["gcc-16-trunk20260901.tar.xz", "gcc-17-trunk20260902.tar.xz"],
-           str(plan))
+    mixed = ["gcc-17-trunk20260801.tar.xz", "gcc-17-trunk20260802.tar.xz",
+             "gcc-17-trunk20260904.tar.xz"]
+    plan = prune_plan(mixed, gcc_rx,
+                      referenced={"gcc-17-trunk20260801.tar.xz"},
+                      today="20260905")
+    expect("old referenced payload survives, old unnamed pruned, "
+           "young unnamed survives",
+           plan == ["gcc-17-trunk20260802.tar.xz"], str(plan))
+
+    # the referenced set comes straight out of the verified Packages
+    # text; related .tar.xz tokens in other fields come along harmlessly
+    pkgs = ("Package: gcc-17\n"
+            "Description: GNU Compiler Collection 17.0.0 "
+            "(gcc-17-trunk20260801.tar.xz), built by Compiler Explorer\n"
+            "Filename: gcc-17_17.trunk20260905_amd64.deb\n\n"
+            "Package: clang-24\n"
+            "Description: Clang 24.0.0 (clang-24-trunk20260901.tar.xz)\n")
+    refs = referenced_payloads(pkgs)
+    expect("Packages scan names the pinned payloads",
+           refs == {"gcc-17-trunk20260801.tar.xz",
+                    "clang-24-trunk20260901.tar.xz"}, str(refs))
+
+    # ---------------- fetch_referenced_payloads through an injected
+    # opener: every defect class returns None and a verified index parses.
+    import http.client
+
+    def mk_release(pkgs_bytes: bytes) -> bytes:
+        sha = hashlib.sha256(pkgs_bytes).hexdigest()
+        return ("Label: diamondinoia\nSHA256:\n"
+                f" {sha} {len(pkgs_bytes):11d} Packages\n").encode()
+
+    good_pkgs = pkgs.encode()
+    good_rel = mk_release(good_pkgs)
+
+    class FakeResp:
+        def __init__(self, body: bytes):
+            self.body = body
+        def read(self, *a):
+            return self.body
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    def fake_opener_factory(responses: dict, exc: Exception | None = None,
+                            exc_on: tuple[str, ...] = ("Packages",)):
+        def fake_opener(req, timeout=0):
+            url = req.full_url if hasattr(req, "full_url") else req
+            if exc is not None and any(url.endswith(s) for s in exc_on):
+                raise exc
+            return FakeResp(responses[url.rsplit("/", 1)[1]])
+        return fake_opener
+
+    cases = [
+        ("corrupt Packages bytes decode-fail returns None",
+         fake_opener_factory({"Release": mk_release(b"\xff\xfe" + good_pkgs),
+                              "Packages": b"\xff\xfe" + good_pkgs})),
+        ("SHA256 mismatch returns None",
+         fake_opener_factory(
+             {"Release": good_rel,
+              # same length, one byte changed: the hash gate alone must
+              # catch it (the size check cannot)
+              "Packages": good_pkgs.replace(b"gcc-17", b"gce-17", 1)})),
+        ("size mismatch returns None",
+         fake_opener_factory(
+             {"Release": ("Label: diamondinoia\nSHA256:\n "
+                          + hashlib.sha256(good_pkgs).hexdigest()
+                          + f" {len(good_pkgs) + 1:11d} Packages\n").encode(),
+              "Packages": good_pkgs})),
+        ("IncompleteRead returns None",
+         fake_opener_factory({"Release": good_rel},
+                             exc=http.client.IncompleteRead(b"half"))),
+        ("an HTML error page the Release did NOT sign is rejected by the "
+         "hash gate (its .tar.xz token never becomes a reference)",
+         fake_opener_factory(
+             {"Release": good_rel,
+              "Packages": b"<html>404 gcc-17-trunk20260801.tar.xz</html>"})),
+        ("Release without a Packages entry returns None",
+         fake_opener_factory({"Release": b"Label: diamondinoia\nSHA256:\n",
+                              "Packages": good_pkgs})),
+        # the Packages checksum line sits under MD5Sum, not SHA256: the
+        # parser must not take a line from another section
+        ("Packages line under MD5Sum only returns None",
+         fake_opener_factory(
+             {"Release": (b"Label: diamondinoia\nMD5Sum:\n "
+                          + hashlib.sha256(good_pkgs).hexdigest().encode()
+                          + f" {len(good_pkgs):11d} Packages\n".encode()),
+              "Packages": good_pkgs})),
+        ("Release fetch itself failing returns None",
+         fake_opener_factory({}, exc=urllib.error.URLError("offline"),
+                             exc_on=("Release",))),
+    ]
+    for label, opener in cases:
+        got = fetch_referenced_payloads(base="https://t.invalid/",
+                                        opener=opener)
+        expect(label, got is None)
+
+    got = fetch_referenced_payloads(
+        base="https://t.invalid/",
+        opener=fake_opener_factory({"Release": good_rel,
+                                    "Packages": good_pkgs}))
+    expect("a size-and-hash-verified index yields its payloads",
+           got == {"gcc-17-trunk20260801.tar.xz",
+                   "clang-24-trunk20260901.tar.xz"}, str(got))
+
+    # sync --dry-run over a missing release must reach no mutating call:
+    # any POST/PATCH/DELETE or release_create means the dry-run lied. The
+    # stubs go into cmd_sync's own globals (__main__ when run as a
+    # script): patching a second `import mirror` module object would leave
+    # the code under test on the real gh and release functions.
+    g = cmd_sync.__globals__
+    # K2: freeze today for every cmd_sync run below: patch the datetime
+    # module global with a fake whose date subclass returns one fixed
+    # calendar day from today(); every fixture date derives from it. The
+    # real datetime module restores after each case, so the suite gives
+    # the same result on any run date.
+    FIXED_TODAY = datetime.date(2026, 9, 5)
+
+    class _FrozenDate(datetime.date):
+        @classmethod
+        def today(cls):
+            return cls(FIXED_TODAY.year, FIXED_TODAY.month, FIXED_TODAY.day)
+
+    class FakeDateTime:
+        date = _FrozenDate
+        timedelta = datetime.timedelta
+
+    def rel_date(days_ago: int) -> str:
+        return (FIXED_TODAY
+                - datetime.timedelta(days=days_ago)).strftime("%Y%m%d")
+
+    def raw_name(fam: str, date: str) -> str:
+        return f"{fam}-{date}.tar.xz"
+
+    saved = {k: g[k] for k in
+             ("gh", "release_create", "get_release",
+              "fetch_referenced_payloads", "dated_prefix_listing",
+              "datetime")}
+    try:
+        def no_mutation(args, **kw):
+            if args[:1] != ["api"]:
+                raise AssertionError(f"non-api gh call: {args}")
+            if "-X" in args:
+                raise AssertionError(f"mutating gh call: {args}")
+            return json.dumps({"assets": []})
+        def boom_create(*a, **kw):
+            raise AssertionError("release_create called")
+        g["gh"] = no_mutation
+        g["release_create"] = boom_create
+        g["get_release"] = lambda *a, **kw: None
+        g["fetch_referenced_payloads"] = lambda: set()
+        g["dated_prefix_listing"] = lambda fam: {}
+        g["datetime"] = FakeDateTime
+        try:
+            cmd_sync(max_downloads=0, selectors=[], dry_run=True)
+            mut = None
+        except AssertionError as e:
+            mut = e
+        expect("sync --dry-run over a missing release makes no mutating call",
+               mut is None, str(mut or ""))
+    finally:
+        g.update(saved)
+
+    # raw dated assets obey the same rule as every dated payload, and
+    # every family keeps its newest dated asset whatever its age. Drives
+    # cmd_sync, not just prune_plan. Cases: an index-None run deletes
+    # nothing; a referenced old raw survives; an old unnamed raw that is
+    # the family's ONLY asset (hence its newest) survives; with a newer
+    # family asset present the old unnamed raw drops; a young raw
+    # survives the age gate even as non-newest.
+    def one_release(*names):
+        return {"id": 1, "assets": [
+            {"name": n, "state": "uploaded", "size": 1,
+             "digest": "sha256:" + "0" * 64, "id": i}
+            for i, n in enumerate(names)]}
+    # The date freeze (FIXED_TODAY, _FrozenDate, FakeDateTime, rel_date)
+    # is defined above, before the first cmd_sync case: every fixture date
+    # derives from the one fixed day.
+    raw_rx_gcc = re.compile(r"^gcc-trunk-(?P<date>\d{8})\.tar\.xz$")
+
+    raw = raw_name("gcc-trunk", rel_date(35))     # older than 14 days
+    raw_new = raw_name("gcc-trunk", rel_date(1))  # newest raw of the family
+    raw_young = raw_name("gcc-trunk", rel_date(3))
+    ren_new = rename_render(families["gcc-trunk"]["rename"], 17, rel_date(0))
+    # a live dated key: with none the family errors and prunes nothing,
+    # which would look like "index None" passing for every case
+    live = {rel_date(0): PREFIX + raw_name("gcc-trunk", rel_date(0))}
+    cases = [
+        ("index None: no raw asset is dropped", [raw, raw_new], None, set()),
+        ("a raw asset named by the index is kept", [raw, raw_new],
+         {raw}, set()),
+        ("an old raw asset that is the family's newest is kept",
+         [raw], set(), set()),
+        ("an old raw asset the index does not name is dropped once the "
+         "family has a newer asset", [raw, raw_new], set(), {raw}),
+        ("a young non-newest raw asset survives the age gate",
+         [raw_young, raw_new], set(), set()),
+        # K1: the family's newest RENAMED payload is protected even when a
+        # newer raw leftover exists; both are old and unnamed. The raw
+        # leftover drops: it is not its class's newest (raw_new is).
+        ("newest renamed payload survives a newer raw leftover",
+         [rename_render(families["gcc-trunk"]["rename"], 17, rel_date(34)),
+          raw_name("gcc-trunk", rel_date(33)), raw_new],
+         set(), {raw_name("gcc-trunk", rel_date(33))}),
+    ]
+    for label, names, refs, want in cases:
+        deleted: list[str] = []
+        saved2 = {k: g[k] for k in
+                  ("get_release", "fetch_referenced_payloads",
+                   "delete_asset", "save_manifest", "dated_prefix_listing",
+                   "gh", "datetime", "load_manifest", "http_head")}
+        try:
+            g["get_release"] = lambda *a, r=one_release(*names), **kw: r
+            g["fetch_referenced_payloads"] = lambda refs=refs: refs
+            g["delete_asset"] = lambda aid, n: deleted.append(n)
+            g["save_manifest"] = lambda *a, **kw: None
+            g["dated_prefix_listing"] = lambda fam, live=live: live
+            g["gh"] = lambda args, **kw: json.dumps({"assets": []})
+            g["datetime"] = FakeDateTime
+            # Rows keyed by family-date for every fixture asset: the
+            # reconciliation branch (which would head and download the
+            # live key) skips any asset whose row exists.
+            def stub_manifest(names=names):
+                rows = {}
+                for n in names:
+                    m = (rename_regex(families["gcc-trunk"]["rename"])
+                         .match(n) or raw_rx_gcc.match(n))
+                    d = m["date"]
+                    rows[f"gcc-trunk-{d}.tar.xz"] = {
+                        "analysis": None, "asset": n, "date": d,
+                        "etag": "E", "family": "gcc-trunk",
+                        "key": f"opt/gcc-trunk-{d}.tar.xz", "kind": "trunk",
+                        "major": 17, "sha256": "0" * 64, "size": 1}
+                return {"meta": manifest_meta(), "rows": rows}
+            g["load_manifest"] = stub_manifest
+            g["http_head"] = lambda url: {"size": 1, "etag": "E"}
+            cmd_sync(max_downloads=0, selectors=["gcc-trunk"])
+            expect(label, set(deleted) == want, f"deleted={deleted}")
+        finally:
+            g.update(saved2)
+
+    # a verified index keeps a named old payload and deletes an unnamed
+    # old one (the named one being non-newest, or it would survive
+    # regardless); and dry-run prints exactly the plan live executes on
+    # the same fixture. The clock is frozen: these dates are relative to
+    # the fixed today, so the case does not depend on the run date.
+    old_named = rename_render(families["gcc-trunk"]["rename"], 17, rel_date(35))
+    old_unnamed = rename_render(families["gcc-trunk"]["rename"], 17, rel_date(34))
+    # old enough to drop, but the newest dated asset the release holds for
+    # the family: the newest-per-family guard must keep it
+    fam_newest = rename_render(families["gcc-trunk"]["rename"], 17, rel_date(33))
+    # Manifest rows give each fixture asset a row (so the reconciliation
+    # branch skips them) and point the live date's row at fam_newest (so
+    # rotation pulls nothing and records no error).
+    def fixture_manifest(*names_dates):
+        return {"meta": manifest_meta(), "rows": {
+            f"gcc-trunk-{d}.tar.xz": {
+                "analysis": None, "asset": n, "date": d, "etag": "E",
+                "family": "gcc-trunk", "key": f"opt/gcc-trunk-{d}.tar.xz",
+                "kind": "trunk", "major": 17,
+                "sha256": "0" * 64, "size": 1}
+            for n, d in names_dates}}
+
+    deleted = []
+    saved3 = {k: g[k] for k in
+              ("get_release", "fetch_referenced_payloads",
+               "delete_asset", "save_manifest", "dated_prefix_listing",
+               "gh", "load_manifest", "datetime")}
+    try:
+        rel = one_release(old_named, old_unnamed, fam_newest)
+        fm = fixture_manifest((old_named, rel_date(35)),
+                              (old_unnamed, rel_date(34)),
+                              (fam_newest, rel_date(33)))
+        g["get_release"] = lambda *a, r=rel, **kw: r
+        g["fetch_referenced_payloads"] = lambda: {old_named}
+        g["delete_asset"] = lambda aid, n: deleted.append(n)
+        g["save_manifest"] = lambda *a, **kw: None
+        g["dated_prefix_listing"] = lambda fam, live=live: live
+        g["gh"] = lambda args, **kw: json.dumps({"assets": []})
+        g["load_manifest"] = lambda fm=fm: json.loads(json.dumps(fm))
+        g["datetime"] = FakeDateTime
+        cmd_sync(max_downloads=0, selectors=["gcc-trunk"])
+        expect("verified index: named old kept, unnamed old deleted, "
+               "newest kept", set(deleted) == {old_unnamed},
+               f"deleted={deleted}")
+        # dry-run on the identical fixture names the same set
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            dry_rc = cmd_sync(max_downloads=0, selectors=["gcc-trunk"],
+                              dry_run=True)
+        would = {line.split("would prune ", 1)[1]
+                 for line in buf.getvalue().splitlines()
+                 if "would prune " in line}
+        expect("dry-run prints the plan live executes",
+               dry_rc == 0 and would == {old_unnamed},
+               f"rc={dry_rc} would={would}")
+    finally:
+        g.update(saved3)
+
+    # K8: the fam in live_dates gate must fail without it. An old unnamed
+    # raw that is NOT its class's newest (raw_new is) sits on a family
+    # whose upstream listing errors; the gate must still prune nothing.
+    deleted = []
+    saved3b = {k: g[k] for k in
+               ("get_release", "fetch_referenced_payloads",
+                "delete_asset", "save_manifest", "dated_prefix_listing",
+                "gh", "load_manifest", "datetime", "http_head")}
+    try:
+        rel = one_release(raw, raw_new)
+        fm = fixture_manifest((raw, rel_date(35)),
+                              (raw_new, rel_date(1)))
+        g["get_release"] = lambda *a, r=rel, **kw: r
+        g["fetch_referenced_payloads"] = lambda: set()
+        g["delete_asset"] = lambda aid, n: deleted.append(n)
+        g["save_manifest"] = lambda *a, **kw: None
+        def offline_listing(fam):
+            raise urllib.error.URLError("offline")
+        g["dated_prefix_listing"] = offline_listing
+        g["gh"] = lambda args, **kw: json.dumps({"assets": []})
+        g["load_manifest"] = lambda fm=fm: json.loads(json.dumps(fm))
+        g["datetime"] = FakeDateTime
+        g["http_head"] = lambda url: {"size": 1, "etag": "E"}
+        cmd_sync(max_downloads=0, selectors=["gcc-trunk"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            dry_rc = cmd_sync(max_downloads=0, selectors=["gcc-trunk"],
+                              dry_run=True)
+        expect("live_dates gate: errored listing keeps non-newest old raw",
+               deleted == [] and "would prune" not in buf.getvalue(),
+               f"deleted={deleted} dry={buf.getvalue()!r}")
+        expect("dry-run exits nonzero when a family listing errored",
+               dry_rc != 0, f"rc={dry_rc}")
+    finally:
+        g.update(saved3b)
+
+    # An empty listing that raises nothing is the same failure live sync
+    # reports ("no live dated keys upstream"): dry-run must exit nonzero
+    # on it through the one shared condition, not a second copy.
+    saved3d = {k: g[k] for k in
+               ("get_release", "fetch_referenced_payloads",
+                "dated_prefix_listing", "gh", "load_manifest",
+                "datetime", "http_head")}
+    try:
+        g["get_release"] = lambda *a, r=one_release(raw_new), **kw: r
+        g["fetch_referenced_payloads"] = lambda: set()
+        g["dated_prefix_listing"] = lambda fam: {}
+        g["gh"] = lambda args, **kw: json.dumps({"assets": []})
+        g["load_manifest"] = lambda fm=fixture_manifest(
+            (raw_new, rel_date(1))): json.loads(json.dumps(fm))
+        g["datetime"] = FakeDateTime
+        g["http_head"] = lambda url: {"size": 1, "etag": "E"}
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            dry_rc = cmd_sync(max_downloads=0, selectors=["gcc-trunk"],
+                              dry_run=True)
+        expect("dry-run exits nonzero on an empty upstream listing",
+               dry_rc != 0, f"rc={dry_rc}")
+    finally:
+        g.update(saved3d)
+
+    # A misspelled selector must fail before any fetch or planning, in
+    # dry-run too (the README promise). get_release and the index fetch
+    # are stubbed to raise: reaching either means validation ran late.
+    saved3c = {k: g[k] for k in
+               ("get_release", "fetch_referenced_payloads",
+                "dated_prefix_listing")}
+    try:
+        def touched(*a, **kw):
+            raise AssertionError("fetch ran before selector validation")
+        g["get_release"] = touched
+        g["fetch_referenced_payloads"] = touched
+        g["dated_prefix_listing"] = touched
+        try:
+            bad_rc = cmd_sync(max_downloads=0, selectors=["no-such-family"],
+                              dry_run=True)
+        except AssertionError:
+            bad_rc = 0
+        expect("bad selector fails before any fetch in dry-run",
+               bad_rc != 0, f"rc={bad_rc}")
+    finally:
+        g.update(saved3c)
+
     # positive control: a foreign name in the plan must raise, never sort wrong
     try:
         prune_plan(["gcc-17-trunk20260904.tar.xz",
-                    "clang-24-trunk20260904.tar.xz"], gcc_rx)
+                    "clang-24-trunk20260904.tar.xz"], gcc_rx,
+                   referenced=set(), today="20260905")
         expect("foreign asset in prune plan raises", False)
     except ValueError:
         expect("foreign asset in prune plan raises", True)
+
+    # A foreign-family name that only sits in referenced or keep_names is
+    # not this family's asset: the plan for this family must not change
+    # and nothing may raise.
+    fam_plan = prune_plan(["gcc-17-trunk20260802.tar.xz"], gcc_rx,
+                          referenced={"clang-24-trunk20260801.tar.xz",
+                                      "gcc-17-trunk20260802.tar.xz"},
+                          today="20260905")
+    expect("foreign name in referenced leaves the plan untouched",
+           fam_plan == [], str(fam_plan))
+    fam_plan = prune_plan(["gcc-17-trunk20260802.tar.xz"], gcc_rx,
+                          referenced=set(), today="20260905",
+                          keep_names={"clang-24-trunk20260801.tar.xz",
+                                      "gcc-17-trunk20260802.tar.xz"})
+    expect("foreign name in keep_names leaves the plan untouched",
+           fam_plan == [], str(fam_plan))
+    # But a foreign name that reaches the plan as one of the family's
+    # assets must raise even when both protection sets would cover it:
+    # the family/date match runs before any keep short-circuit.
+    foreign = "clang-24-trunk20260801.tar.xz"
+    for prot in ({"referenced": {foreign}},
+                 {"referenced": set(), "keep_names": {foreign}},
+                 {"referenced": {foreign}, "keep_names": {foreign}}):
+        try:
+            prune_plan([foreign], gcc_rx, today="20260905", **prot)
+            expect("protected foreign asset still raises", False)
+        except ValueError:
+            expect("protected foreign asset still raises", True)
 
     # classify_asset: every rename scheme classed trunk-renamed; the legacy
     # two classed legacy; raw dated keys classed trunk-raw; junk unknown
@@ -1628,15 +2206,19 @@ def main(argv: list[str]) -> int:
     cmd, rest = argv[0], argv[1:]
     if cmd == "sync":
         max_downloads, selectors = None, []
+        dry_run = False
         i = 0
         while i < len(rest):
             if rest[i] == "--max":
                 max_downloads = int(rest[i + 1])
                 i += 2
+            elif rest[i] == "--dry-run":
+                dry_run = True
+                i += 1
             else:
                 selectors.append(rest[i])
                 i += 1
-        return cmd_sync(max_downloads, selectors)
+        return cmd_sync(max_downloads, selectors, dry_run)
     if cmd == "check":
         return cmd_check("--complete" in rest)
     if cmd == "reanalyze-legacy":
