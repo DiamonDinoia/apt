@@ -976,6 +976,14 @@ def classify_bin(name: str, *, kind: str, triplets: list[str]) -> str | None:
                 aliased = True
                 base = base[len(alias) + 1:]
                 break
+    # The alias itself can nest (bpf-unknown-bpf-unknown-none-gccrs beside
+    # bpf-unknown-none-bpf-unknown-none-gccrs): the loop peels every further
+    # real triplet prefix.
+    if aliased:
+        for t in triplets:
+            while base.startswith(t + "-"):
+                base = base[len(t) + 1:]
+                stripped += 1
     if stripped > 1 and (base in GCC_TOOLS or base in CLANG_TOOLS):
         return "triplet-alias"
     if _TOOL_DUP_RE.fullmatch(base):
@@ -1568,13 +1576,18 @@ def selftest() -> int:
     lp = plans_for(None, "gcc-0-bpf", "nodebian", "gcc", ["bpf-unknown-none"],
                    ["bpf-unknown-none-gcc", "bpf-unknown-gcc",
                     "bpf-unknown-gcc-13.4.0", "bpf-unknown-cc",
-                    "bpf-unknown-addr2line"], "13.4.0")
+                    "bpf-unknown-addr2line",
+                    "bpf-unknown-none-gccrs",
+                    "bpf-unknown-none-bpf-unknown-none-gccrs",
+                    "bpf-unknown-bpf-unknown-none-gccrs"], "13.4.0")
     got = {n: x["class"] for n, x in lp["link_exclusions"].items()}
     expect("bpf CT_TARGET_ALIAS spelling partitioned",
            got == {"bpf-unknown-gcc": "triplet-alias",
                    "bpf-unknown-gcc-13.4.0": "triplet-alias",
                    "bpf-unknown-cc": "no-series-spelling",
-                   "bpf-unknown-addr2line": "bundled-binutils"}
+                   "bpf-unknown-addr2line": "bundled-binutils",
+                   "bpf-unknown-none-bpf-unknown-none-gccrs": "triplet-alias",
+                   "bpf-unknown-bpf-unknown-none-gccrs": "triplet-alias"}
            and lp["launcher"] == "bin/bpf-unknown-none-gcc", str(got))
     lp = plans_for("arm-linux-gnueabihf", "gcc-0-arm", "cross", "gcc",
                    ["arm-unknown-linux-gnueabihf"],
