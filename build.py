@@ -835,12 +835,18 @@ DENY_RE = re.compile(
 # tool emits nothing and is recorded under links_absent.
 GCC_TOOLS = [
     "gcc", "g++", "cpp", "gfortran", "gccgo", "gccrs", "gdc", "gm2",
-    "gcobol", "gcobc", "ga68",
+    "gcobol", "ga68",
     "gnat", "gnatbind", "gnatchop", "gnatclean", "gnatkr", "gnatlink",
     "gnatls", "gnatmake", "gnatname", "gnatprep",
     "gcc-ar", "gcc-nm", "gcc-ranlib",
     "gcov", "gcov-dump", "gcov-tool", "lto-dump",
 ]
+# gcobc is a POSIX sh cobc-compat front end the gcobol build ships; it finds
+# gcobol through $0 (${0%/*}/gcobol), so a /usr/bin/gcobc-NN symlink makes it
+# exec the absolute /usr/bin/gcobol, which exists nowhere. The driver itself,
+# gcobol-NN, stays linked and compiles. Measured: payload /opt/gcc-17/bin/gcobc
+# rc 127 "…/usr/bin/gcobol: not found" via the link, rc 0 beside gcobol.
+SELF_DIR_SHIM = {"gcobc"}
 # clang: the Debian clang-N package ships clang-N, clang++-N, clang-cpp-N and
 # clang-cl-N; the suite's other binaries live in their own splits
 # (clang-tools-N, clang-tidy-N, clang-format-N, llvm-N, lld-N) and are
@@ -934,6 +940,10 @@ EXCLUSION_REASONS = {
     "payload-internal":
         "payload build plumbing (build tool, driver wrapper, test rig or "
         "host-side helper), not a user entry point",
+    "self-dir-shim":
+        "shell front end that finds its driver through $0's directory, so a "
+        "/usr/bin/<tool>-NN symlink retargets that lookup at /usr/bin and the "
+        "script exits 127; the real driver (gcobol-NN) stays linked",
 }
 
 _TOOL_DUP_RE = re.compile(
@@ -994,6 +1004,8 @@ def classify_bin(name: str, *, kind: str, triplets: list[str]) -> str | None:
         return "triplet-alias" if aliased else None
     if base in GO_LIBGO:
         return "go-libgo"
+    if base in SELF_DIR_SHIM:
+        return "self-dir-shim"
     if base in NO_SERIES_SPELLING:
         return "no-series-spelling"
     if base in GCCBUG:
@@ -1472,8 +1484,8 @@ def resolved_spec(specs: dict, repos: dict) -> dict:
 def selftest() -> int:
     """Offline controls for the bundle rules. Every control is a real trip:
     the denylist poison, the version-order gate, the soname table, the
-    maintscript-render placeholder refusal and the gcc-17 28-linked /
-    45-excluded partition oracle from the README."""
+    maintscript-render placeholder refusal and the gcc-17 27-linked /
+    46-excluded partition oracle from the README."""
     rc = 0
 
     def expect(name: str, cond: bool, detail: str = ""):
@@ -1617,6 +1629,17 @@ def selftest() -> int:
     expect("native gnatfind/gnatxref land in gnat-aux",
            {n: x["class"] for n, x in lp["link_exclusions"].items()}
            == {"gnatfind": "gnat-aux", "gnatxref": "gnat-aux"})
+    # gcobc is the self-dir-shim class: it finds gcobol through $0, so a
+    # /usr/bin symlink retargets the exec at /usr/bin/gcobol and exits 127.
+    # The partition emits no gcobc link and keeps gcobol linked.
+    lp = plans_for(None, "gcc-0", "native", "gcc", ["x86_64-linux-gnu"],
+                   ["gcc", "gcobol", "gcobc", "x86_64-linux-gnu-gcobc"])
+    expect("gcobc is excluded, gcobol stays linked, the alias stays an alias",
+           lp["links"] == {"gcobol-0": "bin/gcobol"}
+           and lp["link_exclusions"]["gcobc"]["class"] == "self-dir-shim"
+           and lp["link_exclusions"]["x86_64-linux-gnu-gcobc"]["class"]
+           == "triplet-alias",
+           str(lp["link_exclusions"]))
     try:
         plans_for("mips64-linux-gnuabi64", "gcc-0-mips", "cross", "gcc",
                   ["mips64-unknown-linux-gnu"],
@@ -1700,7 +1723,7 @@ def selftest() -> int:
     expect("tree self-link names /usr/bin/probe in postinst and prerm",
            all("/usr/bin/probe" in text for text in probe.values()))
 
-    # --- gcc-17 partition oracle: 28 linked + 45 excluded (27/15/1/2),
+    # --- gcc-17 partition oracle: 27 linked + 46 excluded (27/15/1/2/1),
     # exactly the README's accounting
     catalog, manifest, _ = load_bundle_inputs()
     plans, pending = bundle_plans(catalog, manifest)
@@ -1712,11 +1735,12 @@ def selftest() -> int:
     else:
         from collections import Counter
         classes = Counter(x["class"] for x in p17["link_exclusions"].values())
-        expect("gcc-17: 27 + launcher = 28 linked, 45 excluded 27/15/1/2",
+        expect("gcc-17: 26 + launcher = 27 linked, 46 excluded 27/15/1/2/1",
                set(p17["links"]) == want_links
                and p17["launcher"] == "bin/gcc"
                and classes == {"bundled-binutils": 27, "triplet-alias": 15,
-                               "no-series-spelling": 1, "go-libgo": 2},
+                               "no-series-spelling": 1, "go-libgo": 2,
+                               "self-dir-shim": 1},
                f"{len(p17['links'])} links, {dict(classes)}")
         expect("gcc-17: 73 bin/ executables accounted for",
                len(p17["links"]) + 1 + len(p17["link_exclusions"]) == 73)

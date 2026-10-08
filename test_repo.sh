@@ -203,11 +203,11 @@ else
 fi
 
 # Check 6: the README names every linked tool and the exclusion accounting of
-# the gcc-17 payload (28 linked; 45 excluded as 27 bundled binutils/gprofng, 15
-# triplet aliases, 1 c++, 2 go/gofmt), so the spec a reader copies from has to
-# be the partition the bundle installs. Docs drift silently; a diff does not. A
-# table the regex fails to find reads as empty and reports all 28 names as
-# missing, so a broken parse cannot pass as agreement.
+# the gcc-17 payload (27 linked; 46 excluded as 27 bundled binutils/gprofng, 15
+# triplet aliases, 1 c++, 2 go/gofmt, 1 gcobc self-dir shim), so the spec a
+# reader copies from has to be the partition the bundle installs. Docs drift
+# silently; a diff does not. A table the regex fails to find reads as empty and
+# reports all 27 names as missing, so a broken parse cannot pass as agreement.
 if python3 - "$spec" <<'DOC'; then
 import json, re, sys
 from collections import Counter
@@ -221,8 +221,8 @@ for name in sorted(listed - want):
     print(f"      the README lists {name}, which the spec does not link")
 for name in sorted(want - listed):
     print(f"      the spec links {name}, which the README does not list")
-ok = listed == want and len(want) == 28
-# The README's exclusion prose is the oracle for the 45-name partition: the
+ok = listed == want and len(want) == 27
+# The README's exclusion prose is the oracle for the 46-name partition: the
 # numerals come from the text itself, so a prose rewrite that drops them fails
 # loudly rather than neutralising the check.
 classes = Counter(x["class"] for x in bundle["link_exclusions"].values())
@@ -232,10 +232,11 @@ if m: oracle["bundled-binutils"] = int(m.group(1))
 m = re.search(r"(\d+) are\s+`?x86_64-linux-gnu-`?\s+aliases", readme)
 if m: oracle["triplet-alias"] = int(m.group(1))
 if re.search(r"[Oo]ne is `?c\+\+`?", readme): oracle["no-series-spelling"] = 1
-if re.search(r"two are `?go`? and `?gofmt`?", readme): oracle["go-libgo"] = 2
+if re.search(r"(?:last )?two are `?go`? and\s+`?gofmt`?", readme): oracle["go-libgo"] = 2
+if re.search(r"[Oo]ne is `?gcobc`?", readme): oracle["self-dir-shim"] = 1
 if oracle != {"bundled-binutils": 27, "triplet-alias": 15,
-              "no-series-spelling": 1, "go-libgo": 2}:
-    print(f"      the README prose no longer states the 27/15/1/2 accounting: {oracle}")
+              "no-series-spelling": 1, "go-libgo": 2, "self-dir-shim": 1}:
+    print(f"      the README prose no longer states the 27/15/1/2/1 accounting: {oracle}")
     ok = False
 if dict(classes) != oracle:
     print(f"      spec exclusion classes {dict(classes)} != README oracle {oracle}")
@@ -246,7 +247,7 @@ if total != 73:
     ok = False
 sys.exit(not ok)
 DOC
-  echo "ok    the README names exactly the spec's 28 linked tools, and its 27/15/1/2 exclusion oracle matches the spec"
+  echo "ok    the README names exactly the spec's 27 linked tools, and its 27/15/1/2/1 exclusion oracle matches the spec"
 else
   echo "FAIL  the README and the spec disagree on the gcc-17 partition"; fail=1
 fi

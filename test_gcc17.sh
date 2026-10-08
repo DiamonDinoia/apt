@@ -126,8 +126,10 @@ ok "gcc-17 and all $(wc -w <<<"$links") linked tools run"
 # either; the x86_64-linux-gnu-* aliases, which carry no version suffix in the
 # payload, so linking them would invent a name no current Debian gcc-NN ships
 # (gcc-12 shipped eight of them, gcc-13 onwards ship none); c++, which has no
-# -NN spelling in Debian; and go and gofmt, which cannot start.
-skip='^(x86_64-linux-gnu-.*|go|gofmt|c\+\+|addr2line|ar|as|c\+\+filt|elfedit'
+# -NN spelling in Debian; go and gofmt, which cannot start; and gcobc, a shell
+# shim that finds gcobol through $0, so a /usr/bin symlink makes it exec the
+# absolute /usr/bin/gcobol and exit 127.
+skip='^(x86_64-linux-gnu-.*|go|gofmt|c\+\+|gcobc|addr2line|ar|as|c\+\+filt|elfedit'
 skip+='|gp-.*|gprof|gprofng.*|ld|ld\.bfd|nm|objcopy|objdump|ranlib|readelf'
 skip+='|size|strings|strip)$'
 linked=$(printf '%s\n' gcc $targets | sort)

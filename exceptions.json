@@ -749,16 +749,6 @@
         "measured": "2026-09-07",
         "reason": "era clang-cl is a driver mode, not a --version-answering binary: '--version' is an unknown argument and clang-cl then exits rc 1 for lack of input files (measured in the banner campaign 2026-09-07). The warning text is the answer."
       },
-      "gcc-15": {
-        "links": {
-          "gcobc-15": {
-            "rc": 127,
-            "stderr": "exec: /usr/bin/gcobol: not found"
-          }
-        },
-        "measured": "2026-09-07",
-        "reason": "/opt/gcc-15/bin/gcobc is a script that execs the absolute /usr/bin/gcobol, which exists in neither the payload nor the baseline (CE's relocate broke the COBOL driver's helper path; measured 2026-09-07). rc 127 + the exec error text is the measured answer."
-      },
       "gcc-4.8.0": {
         "links": {
           "gcc-ar-4.8": {

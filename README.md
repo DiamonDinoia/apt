@@ -355,7 +355,7 @@ asks nothing further of the user.
 `gcc-17` is the head of the `gcc-trunk` nightly family: the deb version pins
 the nightly's date (`17~trunk` followed by it), and the family machinery below
 is what made the name follow the payload's probed major. It installs to
-`/opt/gcc-17` and puts 28 commands on `PATH` under Debian's own `-17` names,
+`/opt/gcc-17` and puts 27 commands on `PATH` under Debian's own `-17` names,
 never shadowing Debian's default compiler.
 
 Every front end and tool the payload ships is linked, spelled the way Debian
@@ -363,22 +363,27 @@ spells it, so a script written against `gcc-17` keeps working after the
 distribution takes the name over:
 
     gcc-17     g++-17        cpp-17         gfortran-17
-    gccgo-17   gdc-17        gm2-17         gcobol-17     gcobc-17
+    gccgo-17   gdc-17        gm2-17         gcobol-17
     gccrs-17   ga68-17
     gcc-ar-17  gcc-nm-17     gcc-ranlib-17
     gcov-17    gcov-dump-17  gcov-tool-17   lto-dump-17
     gnat-17    gnatbind-17   gnatchop-17    gnatclean-17  gnatkr-17
     gnatlink-17  gnatls-17   gnatmake-17    gnatname-17   gnatprep-17
 
+`gcobc` is the one shipped front end that is not linked: it is a shell script
+that finds `gcobol` through `$0`, so a `/usr/bin/gcobc-17` symlink retargets
+that lookup at `/usr/bin/gcobol`, which exists nowhere. `gcobol-17`, the real
+COBOL driver, is linked and compiles.
+
 The link table is derived from the mirror's recorded bin/ inventory, not
-spelled out by hand: the payload's 73 bin/ names partition into the 27 links
-above plus the `gcc-17` launcher itself, and 45 excluded names each carrying a
+spelled out by hand: the payload's 73 bin/ names partition into the 26 links
+above plus the `gcc-17` launcher itself, and 46 excluded names each carrying a
 stated class, so a front end a future payload adds or drops fails the build
 instead of going unnoticed. `build.py --selftest` re-derives this partition
 from the committed manifest row and refuses any other accounting; the same
-28/45 numbers are what the README check pins.
+27/46 numbers are what the README check pins.
 
-The 45 that are not linked fall into four classes. 27 are the bundled binutils
+The 46 that are not linked fall into five classes. 27 are the bundled binutils
 and gprofng: the driver finds them itself, and `dpkg -L` shows Debian's
 `gcc-13` through `gcc-16` put none of them in `PATH` either. 15 are
 `x86_64-linux-gnu-` aliases of drivers already linked; the payload spells them
@@ -386,10 +391,11 @@ without a version, so linking them would have to invent
 `x86_64-linux-gnu-gcc-17`, a name no current Debian `gcc-NN` ships. `gcc-12`
 did ship eight such names; `gcc-13` onwards ship none, so following the current
 convention means leaving them out. One is `c++`, which Debian gives no `-NN`
-spelling. The last two are `go` and `gofmt`, Go programs built against the
-payload's own `libgo`, which exit 127 with `error while loading shared
-libraries` unless the loader is pointed at `/opt/gcc-17/lib64`, and this
-package sets no loader path.
+spelling. One is `gcobc`, the self-dir shim described above: linked it cannot
+start, so the package serves the driver only. The last two are `go` and
+`gofmt`, Go programs built against the payload's own `libgo`, which exit 127
+with `error while loading shared libraries` unless the loader is pointed at
+`/opt/gcc-17/lib64`, and this package sets no loader path.
 
 A bundle's `Depends` come from the recorded analysis, not from a hand list: the
 union of NEEDED sonames across the payload's host executables, mapped through
