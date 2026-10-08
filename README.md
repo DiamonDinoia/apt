@@ -293,7 +293,7 @@ newer raw leftover never makes the newest build-consumed payload deletable);
 an index that cannot be
 fetched or verified prunes nothing that run. Rows orphaned by an
 outside rotation are reaped rather than alarmed: rotation of this class is
-the design.
+the design. That is 240 mirrored payloads, roughly 47 GiB.
 
 Each catalog entry and each trunk family's newest row becomes one bundle deb:
 231 emitted today. A bundle's postinst fetches the payload from the `mirror`

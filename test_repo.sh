@@ -682,7 +682,7 @@ if doccheck_scale README.md; then
 else
   echo "FAIL  the README's scale numbers do not match the machine files"; fail=1
 fi
-sed 's/That is 238 mirrored payloads/That is 237 mirrored payloads/' README.md > "$work/readme-mut"
+sed 's/That is 240 mirrored payloads/That is 239 mirrored payloads/' README.md > "$work/readme-mut"
 if doccheck_scale "$work/readme-mut" >/dev/null 2>&1; then
   echo "FAIL  positive control: a wrong payload count passed the scale check"
   fail=1
