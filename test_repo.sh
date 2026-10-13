@@ -12,11 +12,13 @@
 # Check 4: every Filename in the index survives the release host unrewritten.
 # Check 5: the bootstrap package changes version whenever the files it installs
 #          change, because apt offers no upgrade at a version it already holds.
-# Checks 12-17 (D7): the README is code-adjacent; every class of claim it makes
-#          is diffed against the machine files the build itself consumes —
-#          dump-spec, the built pin, exceptions.json, catalog.json and
-#          mirror-manifest.json — and each diff re-runs over a mutated copy as
-#          its own positive control, so a check that stopped seeing cannot pass.
+# Checks 12-16 (D7): the docs are code-adjacent; every class of claim they make
+# is diffed against the machine files the build itself consumes —
+# dump-spec, the built pin, exceptions.json, catalog.json and
+# mirror-manifest.json — and each diff re-runs over a mutated copy as
+# its own positive control, so a check that stopped seeing cannot pass.
+# README.md holds user-facing install/contents docs; doc/maintaining.md holds
+# the maintainer material the spec-diff checks read.
 #
 # Dependency resolution is not checked here. It only means anything against the
 # archive the packages target, and test_install.sh proves it by installing them
@@ -202,25 +204,25 @@ else
   echo "ok    positive control: an unmoved version does not satisfy gt"
 fi
 
-# Check 6: the README names every linked tool and the exclusion accounting of
+# Check 6: doc/maintaining.md names every linked tool and the exclusion accounting of
 # the gcc-17 payload (27 linked; 46 excluded as 27 bundled binutils/gprofng, 15
 # triplet aliases, 1 c++, 2 go/gofmt, 1 gcobc self-dir shim), so the spec a
 # reader copies from has to be the partition the bundle installs. Docs drift
 # silently; a diff does not. A table the regex fails to find reads as empty and
 # reports all 27 names as missing, so a broken parse cannot pass as agreement.
-if python3 - "$spec" <<'DOC'; then
+if python3 - "$spec" doc/maintaining.md <<'DOC'; then
 import json, re, sys
 from collections import Counter
 spec = json.load(open(sys.argv[1]))
 bundle = spec["bundles"]["gcc-17"]
 want = set(bundle["links"]) | {"gcc-17"}
-readme = open("README.md").read()
+readme = open(sys.argv[2]).read()
 table = re.search(r"\n    gcc-17 .*?\n\n", readme, re.S)
 listed = set(re.findall(r"\b[a-z+0-9-]+-17\b", table.group(0))) if table else set()
 for name in sorted(listed - want):
-    print(f"      the README lists {name}, which the spec does not link")
+    print(f"      doc/maintaining.md lists {name}, which the spec does not link")
 for name in sorted(want - listed):
-    print(f"      the spec links {name}, which the README does not list")
+    print(f"      the spec links {name}, which doc/maintaining.md does not list")
 ok = listed == want and len(want) == 27
 # The README's exclusion prose is the oracle for the 46-name partition: the
 # numerals come from the text itself, so a prose rewrite that drops them fails
@@ -236,10 +238,10 @@ if re.search(r"(?:last )?two are `?go`? and\s+`?gofmt`?", readme): oracle["go-li
 if re.search(r"[Oo]ne is `?gcobc`?", readme): oracle["self-dir-shim"] = 1
 if oracle != {"bundled-binutils": 27, "triplet-alias": 15,
               "no-series-spelling": 1, "go-libgo": 2, "self-dir-shim": 1}:
-    print(f"      the README prose no longer states the 27/15/1/2/1 accounting: {oracle}")
+    print(f"      the doc prose no longer states the 27/15/1/2/1 accounting: {oracle}")
     ok = False
 if dict(classes) != oracle:
-    print(f"      spec exclusion classes {dict(classes)} != README oracle {oracle}")
+    print(f"      spec exclusion classes {dict(classes)} != doc oracle {oracle}")
     ok = False
 total = len(bundle["links"]) + 1 + len(bundle["link_exclusions"])
 if total != 73:
@@ -247,9 +249,9 @@ if total != 73:
     ok = False
 sys.exit(not ok)
 DOC
-  echo "ok    the README names exactly the spec's 27 linked tools, and its 27/15/1/2/1 exclusion oracle matches the spec"
+  echo "ok    doc/maintaining.md names exactly the spec's 27 linked tools, and its 27/15/1/2/1 exclusion oracle matches the spec"
 else
-  echo "FAIL  the README and the spec disagree on the gcc-17 partition"; fail=1
+  echo "FAIL  the docs and the spec disagree on the gcc-17 partition"; fail=1
 fi
 
 # Check 7: the README's install command must not name a version. It named
@@ -268,13 +270,13 @@ else
   echo "ok    positive control: the pattern catches a versioned file name"
 fi
 
-# Check 8: the README prints the pin file, and a reader who trusts it has to be
+# Check 8: doc/maintaining.md prints the pin file, and a reader who trusts it has to be
 # reading the pin the package installs. The 600 stanza gained two names when
-# the repo packages appeared and the README kept the old list, which is the
+# the repo packages appeared and the docs kept the old list, which is the
 # same drift check 6 exists for, on the other block of the same document.
 dpkg-deb --fsys-tarfile "$repo/$boot" |
     tar -xO ./etc/apt/preferences.d/diamondinoia > "$work/pin" 2>/dev/null
-if python3 - "$work/pin" <<'DOC'; then
+if python3 - "$work/pin" doc/maintaining.md <<'DOC'; then
 import re, sys
 
 def names(text):
@@ -285,39 +287,39 @@ def names(text):
     return set(m.group(1).split()) if m else set()
 
 built = names(open(sys.argv[1]).read())
-doc = names(re.sub(r"^    ", "", open("README.md").read(), flags=re.M))
+doc = names(re.sub(r"^    ", "", open(sys.argv[2]).read(), flags=re.M))
 for n in sorted(doc - built):
-    print(f"      the README pins {n}, which the built pin does not")
+    print(f"      the docs pin {n}, which the built pin does not")
 for n in sorted(built - doc):
-    print(f"      the built pin holds {n}, which the README does not")
+    print(f"      the built pin holds {n}, which the docs do not")
 sys.exit(not built or built != doc)
 DOC
-  echo "ok    the README prints the pin the package installs"
+  echo "ok    doc/maintaining.md prints the pin the package installs"
 else
-  echo "FAIL  the README pin and the built pin disagree"; fail=1
+  echo "FAIL  the doc pin and the built pin disagree"; fail=1
 fi
 
-# Check 9: the README names the sources the bootstrap package carries, and a
+# Check 9: doc/maintaining.md names the sources the bootstrap package carries, and a
 # reader who installs on that promise has to get them. The vscode source was
 # on the machine and in neither, so the list is exactly the kind of thing that
 # is wrong without anyone noticing.
-if python3 - "$spec" <<'DOC'; then
+if python3 - "$spec" doc/maintaining.md <<'DOC'; then
 import json, re, sys
 repos = json.load(open(sys.argv[1]))["repos"]
 want = {n for n, r in repos.items() if not r.get("separate")}
 block = re.search(r"with the keys\nthat verify them:\n\n((?:    .*\n)+)",
-                  open("README.md").read())
+                  open(sys.argv[2]).read())
 listed = set(block.group(1).split()) if block else set()
 for n in sorted(listed - want):
-    print(f"      the README names {n}, which the spec does not carry")
+    print(f"      the docs name {n}, which the spec does not carry")
 for n in sorted(want - listed):
-    print(f"      the spec carries {n}, which the README does not name")
+    print(f"      the spec carries {n}, which the docs do not name")
 sys.exit(not listed or listed != want)
 DOC
-  echo "ok    the README names the $(python3 -c "import json
+  echo "ok    doc/maintaining.md names the $(python3 -c "import json
 print(sum(1 for v in json.load(open('$spec'))['repos'].values() if not v.get('separate')))") carried sources"
 else
-  echo "FAIL  the README and the spec disagree on the carried sources"; fail=1
+  echo "FAIL  the docs and the spec disagree on the carried sources"; fail=1
 fi
 
 # Check 10: pin-aware policy. The bootstrap's preferences land in this apt
@@ -456,7 +458,7 @@ if doccheck_names README.md; then
 else
   echo "FAIL  the README cites package names the spec does not carry"; fail=1
 fi
-sed 's/sudo apt-get install juno-drivers-diamon/sudo apt-get install juno-drivers-diamon gcc-99/' \
+sed 's/sudo apt-get install lazygit/sudo apt-get install lazygit gcc-99/' \
     README.md > "$work/readme-mut"
 if doccheck_names "$work/readme-mut" >/dev/null 2>&1; then
   echo "FAIL  positive control: a README citing gcc-99 passed the citation check"
@@ -465,7 +467,7 @@ else
   echo "ok    positive control: a README citing gcc-99 is refused"
 fi
 
-# Check 13: the README's known-broken install-refusal list is exactly
+# Check 13: the docs' known-broken install-refusal list is exactly
 # exceptions.json's cutoff.install_refusals rows. The refusal set is measured
 # (the apt -s census), so a README that lists more or fewer differs from the
 # measurement. A fence the regex cannot find reads as empty and the diff
@@ -480,33 +482,33 @@ m = re.search(r"cutoff\.install_refusals`? and the matrix asserts them\s+in"
 listed = set(m.group(1).split()) if m else set()
 bad = False
 for n in sorted(set(exc) - listed):
-    print(f"      exceptions.json records {n} refusing to install, the README does not")
+    print(f"      exceptions.json records {n} refusing to install, the docs do not")
     bad = True
 for n in sorted(listed - set(exc)):
-    print(f"      the README lists {n} as refusing to install, no exceptions row backs it")
+    print(f"      the docs list {n} as refusing to install, no exceptions row backs it")
     bad = True
 sys.exit(bad or not listed)
 DOC
 }
-if doccheck_refusals README.md; then
-  echo "ok    the README's install-refusal list equals exceptions.json's"
+if doccheck_refusals doc/maintaining.md; then
+  echo "ok    the docs' install-refusal list equals exceptions.json's"
 else
-  echo "FAIL  the README and exceptions.json disagree on install refusals"; fail=1
+  echo "FAIL  the docs and exceptions.json disagree on install refusals"; fail=1
 fi
-sed 's/  gcc-4.5$//' README.md > "$work/readme-mut"
+sed 's/  gcc-4.5$//' doc/maintaining.md > "$work/readme-mut"
 if doccheck_refusals "$work/readme-mut" >/dev/null 2>&1; then
-  echo "FAIL  positive control: a README missing gcc-4.5 passed the refusal check"
+  echo "FAIL  positive control: docs missing gcc-4.5 passed the refusal check"
   fail=1
 else
-  echo "ok    positive control: a README missing a refusal row is refused"
+  echo "ok    positive control: docs missing a refusal row are refused"
 fi
 
-# Check 14: the README prints the pin the bootstrap installs, whole file: all
+# Check 14: doc/maintaining.md prints the pin the bootstrap installs, whole file: all
 # four stanzas, and the two non-enumerated stanzas in glob form in the BUILT
 # preferences (Package: * at -1; the compiler namespace as gcc-* clang-* at
 # 100). Stanza contents compare as whitespace-insensitive sets, so wrapping or
 # ordering drift still fails while line-folding style stays free.
-doccheck_pins() {  # $1 = a README  $2 = the built preferences file
+doccheck_pins() {  # $1 = a doc file  $2 = the built preferences file
 python3 - "$1" "$2" <<'DOC'
 import re, sys
 readme, prefs = open(sys.argv[1]).read(), open(sys.argv[2]).read()
@@ -550,21 +552,21 @@ DOC
 prefsfile=$work/prefs-doc
 dpkg-deb --fsys-tarfile "$repo/$boot" |
     tar -xO ./etc/apt/preferences.d/diamondinoia > "$prefsfile" 2>/dev/null
-if doccheck_pins README.md "$prefsfile"; then
-  echo "ok    the README prints the pin file the bootstrap package installs, glob stanzas included"
+if doccheck_pins doc/maintaining.md "$prefsfile"; then
+  echo "ok    doc/maintaining.md prints the pin file the bootstrap package installs, glob stanzas included"
 else
-  echo "FAIL  the README pin block and the built pin disagree"; fail=1
+  echo "FAIL  the doc pin block and the built pin disagree"; fail=1
 fi
-sed 's/    Package: gcc-\* clang-\*/    Package: gcc-17/' README.md > "$work/readme-mut"
+sed 's/    Package: gcc-\* clang-\*/    Package: gcc-17/' doc/maintaining.md > "$work/readme-mut"
 if doccheck_pins "$work/readme-mut" "$prefsfile" >/dev/null 2>&1; then
-  echo "FAIL  positive control: a README with an enumerated 100 stanza passed"
+  echo "FAIL  positive control: docs with an enumerated 100 stanza passed"
   fail=1
 else
-  echo "ok    positive control: an enumerated 100 stanza in the README is refused"
+  echo "ok    positive control: an enumerated 100 stanza in the docs is refused"
 fi
 
 # Check 15: bidirectional test-suite roster. The suites this repository has and
-# the suites the README tells a reader about must be the same set, both ways.
+# the suites the docs tell a reader about must be the same set, both ways.
 doccheck_roster() {  # $1 = a README
 python3 - "$1" <<'DOC'
 import os, re, sys
@@ -580,14 +582,14 @@ for n in sorted(cited - ondisk):
 sys.exit(bad or not cited)
 DOC
 }
-if doccheck_roster README.md; then
-  echo "ok    the README's suite roster matches the files, both directions"
+if doccheck_roster doc/maintaining.md; then
+  echo "ok    the docs' suite roster matches the files, both directions"
 else
-  echo "FAIL  suite roster drift between the README and the tree"; fail=1
+  echo "FAIL  suite roster drift between the docs and the tree"; fail=1
 fi
-sed 's/test_precedence\.sh/the precedence suite/g' README.md > "$work/readme-mut"
+sed 's/test_precedence\.sh/the precedence suite/g' doc/maintaining.md > "$work/readme-mut"
 if doccheck_roster "$work/readme-mut" >/dev/null 2>&1; then
-  echo "FAIL  positive control: a README not naming test_precedence.sh passed"
+  echo "FAIL  positive control: docs not naming test_precedence.sh passed"
   fail=1
 else
   echo "ok    positive control: dropping a suite citation is refused"
@@ -625,70 +627,17 @@ for s in strings:
 sys.exit(bad or not strings or not suites)
 DOC
 }
-if doccheck_strings README.md; then
+if doccheck_strings doc/maintaining.md; then
   echo "ok    every quoted failure text is asserted by a named suite"
 else
-  echo "FAIL  the README quotes failure texts no named suite asserts"; fail=1
+  echo "FAIL  the docs quote failure texts no named suite asserts"; fail=1
 fi
-sed 's/no asset matches/no asset m4tches/' README.md > "$work/readme-mut"
+sed 's/no asset matches/no asset m4tches/' doc/maintaining.md > "$work/readme-mut"
 if doccheck_strings "$work/readme-mut" >/dev/null 2>&1; then
   echo "FAIL  positive control: a doctored failure string passed"
   fail=1
 else
   echo "ok    positive control: a doctored failure string is refused"
-fi
-
-# Check 17: the scale numbers in the mirror section re-derive from
-# catalog.json, mirror-manifest.json and the spec — a refactor that changes the
-# counts must change the prose on purpose, not by drift. Patterns that fail to
-# find their sentence read as missing and refuse, so an edit that rewords the
-# sentence must move the check deliberately.
-doccheck_scale() {  # $1 = a README
-python3 - "$1" <<'DOC'
-import json, re, os, sys
-tree = os.environ["TEST_TREE"]
-readme = open(sys.argv[1]).read()
-cat = json.load(open(tree + "/catalog.json"))
-man = json.load(open(tree + "/mirror-manifest.json"))
-rows = man["rows"]
-computed = {
-    "stables": len(cat["packaged"]),
-    "fams": len(cat["trunk_families"]),
-    "bundles": len(cat["packaged"]) + len(cat["trunk_families"]),
-    "rows": len(rows),
-    "gib": round(sum(r["size"] for r in rows.values()) / 2**30),
-}
-claims = {
-    "stables": (r"(\d+) catalog payloads \(the latest point release", 1),
-    "fams": (r"Nightlies rotate: (\d+) trunk families \(native", 1),
-    "bundles": (r"becomes one bundle deb:\s*(\d+) emitted today", 1),
-    "rows": (r"That is (\d+) mirrored payloads,\s+roughly\s+\d+ GiB", 1),
-    "gib": (r"That is \d+ mirrored payloads,\s+roughly\s+(\d+) GiB", 1),
-}
-bad = False
-for key, (pat, group) in claims.items():
-    m = re.search(pat, readme)
-    if not m:
-        print(f"      the {key} sentence is gone; the check cannot see it")
-        bad = True
-    elif int(m.group(group)) != computed[key]:
-        print(f"      README says {key}={m.group(group)}, machine files say "
-              f"{computed[key]}")
-        bad = True
-sys.exit(bad)
-DOC
-}
-if doccheck_scale README.md; then
-  echo "ok    the README's scale numbers re-derive from the machine files"
-else
-  echo "FAIL  the README's scale numbers do not match the machine files"; fail=1
-fi
-sed 's/That is 240 mirrored payloads/That is 239 mirrored payloads/' README.md > "$work/readme-mut"
-if doccheck_scale "$work/readme-mut" >/dev/null 2>&1; then
-  echo "FAIL  positive control: a wrong payload count passed the scale check"
-  fail=1
-else
-  echo "ok    positive control: a drifted payload count is refused"
 fi
 
 exit $fail

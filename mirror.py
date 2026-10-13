@@ -1876,7 +1876,8 @@ def cmd_selftest() -> int:
         g.update(saved3d)
 
     # A misspelled selector must fail before any fetch or planning, in
-    # dry-run too (the README promise). get_release and the index fetch
+    # dry-run too (the doc/maintaining.md prune promise). get_release and
+    # the index fetch
     # are stubbed to raise: reaching either means validation ran late.
     saved3c = {k: g[k] for k in
                ("get_release", "fetch_referenced_payloads",

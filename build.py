@@ -786,7 +786,8 @@ SONAME_PACKAGES = {
     "libfl.so.2": "libfl2",
 }
 # Sonames the payload ships for its own tools; they resolve from the payload
-# lib dir (or not at all: the go helpers have no rpath, see the README). They
+# lib dir (or not at all: the go helpers have no rpath, see
+# doc/maintaining.md). They
 # get their own dump-spec column rather than conflating with unmatched ones.
 PAYLOAD_INTERNAL_SONAME_RE = re.compile(
     r"^(libgo\.so\.\d+|libclang[^/]*\.so.*|libLLVM[^/]*\.so.*|liblldb[^/]*\.so.*)$")
@@ -1485,7 +1486,7 @@ def selftest() -> int:
     """Offline controls for the bundle rules. Every control is a real trip:
     the denylist poison, the version-order gate, the soname table, the
     maintscript-render placeholder refusal and the gcc-17 27-linked /
-    46-excluded partition oracle from the README."""
+    46-excluded partition oracle documented in doc/maintaining.md."""
     rc = 0
 
     def expect(name: str, cond: bool, detail: str = ""):
@@ -1724,7 +1725,7 @@ def selftest() -> int:
            all("/usr/bin/probe" in text for text in probe.values()))
 
     # --- gcc-17 partition oracle: 27 linked + 46 excluded (27/15/1/2/1),
-    # exactly the README's accounting
+    # exactly the accounting doc/maintaining.md prints
     catalog, manifest, _ = load_bundle_inputs()
     plans, pending = bundle_plans(catalog, manifest)
     p17 = plans.get("gcc-17")
