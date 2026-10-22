@@ -281,6 +281,20 @@ version_re = '^clevofan-dkms_([^_]+)_amd64\.deb$'
 description = "Clevo/Juno EC fan control module (dkms), ec_transaction-serialized, forked build"
 homepage = "https://github.com/DiamonDinoia/clevofan"
 
+# The maths wallpapers and the Spread lock screen plugin for KDE Plasma, from
+# DiamonDinoia/wallpapers, whose CI renders the plates, builds the deb, installs it
+# in debian:sid and runs Plasma on Xvfb against it (deb/test.sh), then attaches
+# it to its `builds` release. Passthrough: the plates are the package, so the deb
+# is served bit-identical, pinned to the digest GitHub reports.
+[diamondinoia-wallpapers]
+install = "passthrough"
+repo = "DiamonDinoia/wallpapers"
+tag = "builds"
+asset = '^diamondinoia-wallpapers_[^_]+_all\.deb$'
+version_re = '^diamondinoia-wallpapers_([^_]+)_all\.deb$'
+description = "Generative maths wallpapers and the Spread screensaver for KDE Plasma"
+homepage = "https://github.com/DiamonDinoia/wallpapers"
+
 # Compiler payloads (gcc/clang stables and trunk families) are not listed
 # here: build.py derives one bundle per catalog.json entry from the recorded
 # Debian naming shapes and mirror-manifest.json's per-payload analysis. The

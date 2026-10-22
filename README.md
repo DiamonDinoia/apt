@@ -37,6 +37,8 @@ The wrappers and the fork-built debs:
 - `juno-kde-fancontrol`: fan control for Juno (Clevo) laptops
 - `ec-sys-dkms`: ec_sys embedded-controller debugfs module (dkms), forked build
 - `clevofan-dkms`: Clevo EC fan-control module (dkms), forked build
+- `diamondinoia-wallpapers`: maths wallpapers and the Spread lock screen for
+  KDE Plasma, set once for each user at the next login
 - `diamondinoia-repo-cuda`: apt source for NVIDIA's CUDA repository
 - `diamondinoia-repo-juno`: apt source for Juno Computers' repository
 

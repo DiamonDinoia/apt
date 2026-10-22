@@ -76,7 +76,8 @@ The bootstrap package installs `/etc/apt/preferences.d/diamondinoia`:
     Pin: release l=diamondinoia
     Pin-Priority: 600
 
-    Package: clevo-keyboard-dkms clevofan-dkms ec-sys-dkms juno-drivers-diamon juno-kde-fancontrol
+    Package: clevo-keyboard-dkms clevofan-dkms diamondinoia-wallpapers ec-sys-dkms
+     juno-drivers-diamon juno-kde-fancontrol
     Pin: release l=diamondinoia
     Pin-Priority: 500
 
