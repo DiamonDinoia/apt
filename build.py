@@ -890,6 +890,8 @@ CLANG_INTERNAL = {
     "c-index-test", "clang-tblgen", "diagtool", "hmaptool",
     "clang-linker-wrapper", "clang-nvlink-wrapper", "clang-offload-bundler",
     "clang-offload-wrapper", "clang-sycl-linker", "sycl-ls",
+    # ClangIR's MLIR developer tools (clang 24): no Debian package ships them
+    "cir-opt", "cir-translate", "cir-lsp-server",
 }
 LLVM_EXACT = {  # llvm-N / lld-N namespace, shippable but not ours to spell
     "opt", "llc", "lli", "llubi", "lld", "ld.lld", "ld64.lld", "wasm-ld",
