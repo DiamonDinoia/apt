@@ -150,3 +150,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./test_gcc17.sh
+
+  notify-failure:
+    needs: [build]
+    if: failure() || cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue or comment on the open one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+          RESULT: ${{ needs.build.result }}
+        run: |
+          issue=$(gh issue list --label nightly-failure --state open --json number -q '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "@$OWNER Workflow run $RESULT (event: $EVENT): $RUN_URL"
+          else
+            gh label create nightly-failure --color B60205 --force
+            gh issue create --title "Nightly apt build failed" --label nightly-failure --assignee "$OWNER" --body "@$OWNER Workflow run $RESULT (event: $EVENT): $RUN_URL"
+          fi
