@@ -536,6 +536,22 @@ except SystemExit as e:
     print(f"ok    build stops on the new major, naming it: {msg}")
 else:
     print("FAIL  mutated listing resolved anyway"); sys.exit(1)
+
+# Ambiguous arm: two assets match a spec with no version_re and nothing picks
+# one; the build must stop naming both instead of shipping matches[0].
+nospec = {"repo": build.SELF, "tag": "mirror",
+          "asset": r"^gcc-17-trunk\d{8}\.tar\.xz$"}
+build._RELEASES[ep] = {"tag_name": "mirror", "assets": [
+    asset("gcc-17-trunk20270101.tar.xz"), asset("gcc-17-trunk20270202.tar.xz")]}
+try:
+    build.resolve("ctl-trunk", nospec)
+except SystemExit as e:
+    msg = str(e)
+    assert "gcc-17-trunk20270101.tar.xz" in msg and \
+        "gcc-17-trunk20270202.tar.xz" in msg, msg
+    print(f"ok    build stops on two matching assets, naming both: {msg}")
+else:
+    print("FAIL  two matching assets resolved anyway"); sys.exit(1)
 PYEOF
   stamp ctl_mutated_listing
 }

@@ -210,6 +210,11 @@ def resolve(name: str, spec: dict) -> dict:
                     asset = candidate
             version = ver(asset)
         else:
+            if len(matches) > 1:
+                names = ", ".join(a["name"] for a in matches)
+                raise SystemExit(f"{name}: {len(matches)} assets match "
+                                 f"{spec['asset']!r} and no version_re picks "
+                                 f"one: {names}")
             asset = matches[0]
             version = release["tag_name"].lstrip("v")
         digest = asset.get("digest") or ""
