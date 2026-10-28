@@ -71,7 +71,7 @@ icon = "audio-headset"
 [ghostty]
 install = "deb"
 repo = "dariogriffo/ghostty-debian"
-asset = '^ghostty_[0-9.]+-[0-9]+\.forky_amd64\.deb$'
+asset = '^ghostty_[0-9.]+-[0-9]+\.griffo_amd64\.deb$'
 description = "GPU-accelerated terminal emulator"
 homepage = "https://ghostty.org"
 license = "MIT"
