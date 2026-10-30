@@ -131,7 +131,7 @@ for it. Bundle `Depends` come from the recorded NEEDED-soname union, plus
 
 ### The gcc-17 partition
 
-`gcc-17` installs to `/opt/gcc-17` and puts 27 commands on `PATH` under
+`gcc-17` installs to `/opt/gcc-17` and puts its commands on `PATH` under
 Debian's own `-17` names:
 
     gcc-17     g++-17        cpp-17         gfortran-17
@@ -142,17 +142,19 @@ Debian's own `-17` names:
     gnat-17    gnatbind-17   gnatchop-17    gnatclean-17  gnatkr-17
     gnatlink-17  gnatls-17   gnatmake-17    gnatname-17   gnatprep-17
 
-The payload's 73 bin/ names partition into those 27 names (26 links plus the
-`gcc-17` launcher) and 46 excluded names. 27 are the bundled binutils and
-gprofng, which the driver finds itself. 15 are `x86_64-linux-gnu-` aliases of
+Every payload bin/ name is one of the names above (a link or the `gcc-17`
+launcher) or an excluded name in exactly one class. Counts move when a trunk
+snapshot adds or drops a tool, so this text states rules, not counts. The
+bundled binutils and gprofng are excluded because the driver finds them
+itself. The `x86_64-linux-gnu-` aliases are excluded because they alias
 drivers already linked, spelled without a version, so linking them would have
-to invent a name no current Debian `gcc-NN` ships. One is `c++`, which Debian
-gives no `-NN` spelling. One is `gcobc`, a shell script that finds `gcobol`
-through `$0`, so a `/usr/bin/gcobc-17` symlink retargets that lookup at a
-binary that exists nowhere. The last two are `go` and `gofmt`, built against
-the payload's own `libgo` with no loader path. `build.py --selftest`
-re-derives this partition from the committed manifest row and refuses any
-other accounting.
+to invent a name no current Debian `gcc-NN` ships. `c++` is excluded because
+Debian gives it no `-NN` spelling. `gcobc` is excluded because it is a shell
+script that finds `gcobol` through `$0`, so a `/usr/bin/gcobc-17` symlink
+retargets that lookup at a binary that exists nowhere. `go` and `gofmt` are
+excluded because they are built against the payload's own `libgo` with no
+loader path. `build.py --selftest` re-derives this partition from the frozen
+fixture `tests/gcc17-partition.json` and refuses any other accounting.
 
 ## Known-broken installs
 

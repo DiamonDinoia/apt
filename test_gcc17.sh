@@ -162,20 +162,24 @@ unresolved() {          # libraries $1 needs that the container cannot supply
 missing=$(find /opt/gcc-17 -type f \( -perm -u+x -o -name '*.so*' \) |
           while read -r f; do unresolved "$f"; done)
 
-# One class is accepted: go, gofmt and the four binaries gccgo runs for cgo are
-# built against the payload's own libgo with no rpath to it. None is linked onto
-# PATH and cgo does not work. Everything else has to resolve against what this
-# package declares.
-other=$(grep -v ' libgo\.so\.25$' <<<"$missing") || other=
+# One class is accepted: go, gofmt and the binaries gccgo runs for cgo are
+# built against the payload's own libgo with no rpath to it, and a trunk
+# snapshot bumps that soname on its own schedule, so the pattern floats.
+# None is linked onto PATH and cgo does not work. Everything else has to
+# resolve against what this package declares.
+other=$(grep -v ' libgo\.so\.[0-9][0-9]*$' <<<"$missing") || other=
 [ -z "$other" ] || fail "unresolved shared libraries:$(printf '\n  %s' $other)"
 ok "every payload object resolves apart from the Go helpers"
 
-# Control: those Go helpers are permanently unresolvable, so a sweep that stops
-# reporting them has stopped working. It runs on the same find and the same
-# loop as the check above, not on a separate call.
-n=$(grep -c ' libgo\.so\.25$' <<<"$missing") || n=0
-[ "$n" -eq 6 ] || fail "control: the sweep reported $n Go helpers, expected 6"
-ok "control: the sweep still reports all $n unresolvable Go helpers"
+# Control: those Go helpers are permanently unresolvable, so a sweep that
+# stops reporting them has stopped working. Only zero fails: the count and
+# the soname move with the daily snapshot, the tripwire is the class going
+# silent. It runs on the same find and the same loop as the check above,
+# not on a separate call.
+n=$(grep -c ' libgo\.so\.[0-9][0-9]*$' <<<"$missing") || n=0
+[ "$n" -ge 1 ] ||
+    fail "control: the sweep reports no Go helpers, so it can no longer see them"
+ok "control: the sweep still reports $n unresolvable Go helpers"
 
 echo "== the compiler reports the major the package is named for"
 gcc-17 --version | sed -n 1p

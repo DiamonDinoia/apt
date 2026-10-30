@@ -1492,8 +1492,10 @@ def resolved_spec(specs: dict, repos: dict) -> dict:
 def selftest() -> int:
     """Offline controls for the bundle rules. Every control is a real trip:
     the denylist poison, the version-order gate, the soname table, the
-    maintscript-render placeholder refusal and the gcc-17 27-linked /
-    46-excluded partition oracle documented in doc/maintaining.md."""
+    maintscript-render placeholder refusal and the gcc-17 partition oracle:
+    the frozen fixture tests/gcc17-partition.json, checked through the real
+    plan_links/classify_bin path, so a trunk snapshot that adds or drops a
+    correctly classified name moves no oracle."""
     rc = 0
 
     def expect(name: str, cond: bool, detail: str = ""):
@@ -1731,27 +1733,34 @@ def selftest() -> int:
     expect("tree self-link names /usr/bin/probe in postinst and prerm",
            all("/usr/bin/probe" in text for text in probe.values()))
 
-    # --- gcc-17 partition oracle: 27 linked + 46 excluded (27/15/1/2/1),
-    # exactly the accounting doc/maintaining.md prints
+    # --- gcc-17 partition oracle, pinned to the frozen
+    # tests/gcc17-partition.json fixture (the 20261030 trunk bin/ universe)
+    # instead of the live trunk row: a snapshot that adds or drops a correctly
+    # classified name only moves counts and cannot fail here, while any fixture
+    # name that lands in another package (or in none) fails through the real
+    # plan_links/classify_bin path. The classifier knobs below are the frozen
+    # row's own (native x86_64-linux-gnu, 17.0.0).
     catalog, manifest, _ = load_bundle_inputs()
     plans, pending = bundle_plans(catalog, manifest)
     p17 = plans.get("gcc-17")
-    want_links = {f"{t}-17" for t in GCC_TOOLS} - {"gcc-17"}
     if not p17 or p17["state"] != "emit":
         expect("gcc-17 bundle is emittable off the reanalyzed rows", False,
                p17 and p17["state"] or "absent")
     else:
-        from collections import Counter
-        classes = Counter(x["class"] for x in p17["link_exclusions"].values())
-        expect("gcc-17: 26 + launcher = 27 linked, 46 excluded 27/15/1/2/1",
-               set(p17["links"]) == want_links
-               and p17["launcher"] == "bin/gcc"
-               and classes == {"bundled-binutils": 27, "triplet-alias": 15,
-                               "no-series-spelling": 1, "go-libgo": 2,
-                               "self-dir-shim": 1},
-               f"{len(p17['links'])} links, {dict(classes)}")
-        expect("gcc-17: 73 bin/ executables accounted for",
-               len(p17["links"]) + 1 + len(p17["link_exclusions"]) == 73)
+        fix = json.loads((ROOT / "tests" / "gcc17-partition.json").read_text())
+        flp = plan_links("gcc-17", kind="native", family_kind="gcc",
+                         series="17", catalog_triplet="x86_64-linux-gnu",
+                         analysis={"bin": fix["bin"],
+                                   "gcc_targets": ["x86_64-linux-gnu"],
+                                   "gcc_version": "17.0.0"})
+        got = {n: x["class"] for n, x in flp["link_exclusions"].items()}
+        expect("gcc-17 fixture partition: launcher, link targets and every "
+               "exclusion class hold",
+               flp["launcher"] == "bin/gcc" and got == fix["exclusions"]
+               and {t.removeprefix("bin/") for t in flp["links"].values()}
+               == set(fix["bin"]) - set(fix["exclusions"]) - {"gcc"},
+               f"{len(flp['links'])} links, moved names "
+               f"{sorted(n for n in set(got) | set(fix['exclusions']) if got.get(n) != fix['exclusions'].get(n))}")
     # --- pending gate: payloads without an analyzed manifest row are skipped
     # and counted, never silently emitted. The completed mirror leaves pending
     # at zero; dropping one row must move exactly its payload into the count.

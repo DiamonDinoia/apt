@@ -204,52 +204,46 @@ else
   echo "ok    positive control: an unmoved version does not satisfy gt"
 fi
 
-# Check 6: doc/maintaining.md names every linked tool and the exclusion accounting of
-# the gcc-17 payload (27 linked; 46 excluded as 27 bundled binutils/gprofng, 15
-# triplet aliases, 1 c++, 2 go/gofmt, 1 gcobc self-dir shim), so the spec a
-# reader copies from has to be the partition the bundle installs. Docs drift
-# silently; a diff does not. A table the regex fails to find reads as empty and
-# reports all 27 names as missing, so a broken parse cannot pass as agreement.
-if python3 - "$spec" doc/maintaining.md <<'DOC'; then
+# Check 6: doc/maintaining.md names every linked tool and the exclusion rules
+# of the gcc-17 payload (the `gcc-17` launcher plus one link per linked tool;
+# every other bin/ name excluded in exactly one documented class), so the spec
+# a reader copies from has to be the partition the bundle installs. The prose
+# states rules, not counts: trunk snapshots move the counts, and the class set
+# is pinned to the frozen tests/gcc17-partition.json fixture instead. Docs
+# drift silently; a diff does not. A table the regex fails to find reads as
+# empty and reports every name as missing, so a broken parse cannot pass as
+# agreement.
+if python3 - "$spec" doc/maintaining.md tests/gcc17-partition.json <<'DOC'; then
 import json, re, sys
-from collections import Counter
 spec = json.load(open(sys.argv[1]))
 bundle = spec["bundles"]["gcc-17"]
 want = set(bundle["links"]) | {"gcc-17"}
 readme = open(sys.argv[2]).read()
+fix = json.load(open(sys.argv[3]))
 table = re.search(r"\n    gcc-17 .*?\n\n", readme, re.S)
 listed = set(re.findall(r"\b[a-z+0-9-]+-17\b", table.group(0))) if table else set()
 for name in sorted(listed - want):
     print(f"      doc/maintaining.md lists {name}, which the spec does not link")
 for name in sorted(want - listed):
     print(f"      the spec links {name}, which doc/maintaining.md does not list")
-ok = listed == want and len(want) == 27
-# The README's exclusion prose is the oracle for the 46-name partition: the
-# numerals come from the text itself, so a prose rewrite that drops them fails
-# loudly rather than neutralising the check.
-classes = Counter(x["class"] for x in bundle["link_exclusions"].values())
-oracle = {}
-m = re.search(r"(\d+) are\s+the\s+bundled\s+binutils", readme)
-if m: oracle["bundled-binutils"] = int(m.group(1))
-m = re.search(r"(\d+) are\s+`?x86_64-linux-gnu-`?\s+aliases", readme)
-if m: oracle["triplet-alias"] = int(m.group(1))
-if re.search(r"[Oo]ne is `?c\+\+`?", readme): oracle["no-series-spelling"] = 1
-if re.search(r"(?:last )?two are `?go`? and\s+`?gofmt`?", readme): oracle["go-libgo"] = 2
-if re.search(r"[Oo]ne is `?gcobc`?", readme): oracle["self-dir-shim"] = 1
-if oracle != {"bundled-binutils": 27, "triplet-alias": 15,
-              "no-series-spelling": 1, "go-libgo": 2, "self-dir-shim": 1}:
-    print(f"      the doc prose no longer states the 27/15/1/2/1 accounting: {oracle}")
-    ok = False
-if dict(classes) != oracle:
-    print(f"      spec exclusion classes {dict(classes)} != doc oracle {oracle}")
-    ok = False
-total = len(bundle["links"]) + 1 + len(bundle["link_exclusions"])
-if total != 73:
-    print(f"      gcc-17 accounts for {total} bin/ names, expected 73")
+ok = listed == want
+# The doc's exclusion prose is the oracle for the class rules: every class in
+# the frozen fixture keeps its distinguishing phrase, so a prose rewrite that
+# drops one fails loudly rather than neutralising the check. Counts are
+# deliberately absent from both sides.
+classes = set(fix["exclusions"].values())
+prose = set()
+if re.search(r"bundled\s+binutils", readme): prose.add("bundled-binutils")
+if re.search(r"`?x86_64-linux-gnu-`?\s+aliases", readme): prose.add("triplet-alias")
+if re.search(r"`c\+\+`", readme): prose.add("no-series-spelling")
+if re.search(r"`gcobc`", readme): prose.add("self-dir-shim")
+if re.search(r"`go`\s+and\s+`gofmt`", readme): prose.add("go-libgo")
+if prose != classes:
+    print(f"      the doc prose no longer describes exactly the frozen classes: {sorted(prose)} != {sorted(classes)}")
     ok = False
 sys.exit(not ok)
 DOC
-  echo "ok    doc/maintaining.md names exactly the spec's 27 linked tools, and its 27/15/1/2/1 exclusion oracle matches the spec"
+  echo "ok    doc/maintaining.md names exactly the spec's linked tools, and its exclusion prose matches the frozen fixture classes"
 else
   echo "FAIL  the docs and the spec disagree on the gcc-17 partition"; fail=1
 fi
@@ -381,7 +375,7 @@ else
 fi
 
 # Check 11: the bundle rules' poison controls (denylist P/C/R, version-order
-# gate, soname table, the gcc-17 28/45 oracle) run offline in build.py.
+# gate, soname table, the gcc-17 fixture partition oracle) run offline in build.py.
 if python3 "$(cd "$(dirname "$0")" && pwd)/build.py" --selftest > "$work/selftest.log" 2>&1; then
   echo "ok    bundle-rule selftest clean"
 else
