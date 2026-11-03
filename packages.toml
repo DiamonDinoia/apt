@@ -80,7 +80,7 @@ license = "MIT"
 [discord]
 install = "deb"
 url = "https://discord.com/api/download?platform=linux&format=deb"
-version_re = 'discord-([0-9.]+)\.deb'
+version_re = '/([0-9.]+)/[^/]+\.deb$'
 description = "Voice and text chat client"
 homepage = "https://discord.com"
 license = "Proprietary, Discord Terms of Service"
