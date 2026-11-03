@@ -212,6 +212,14 @@ exceptions = json.load(open(f"{root}/exceptions.json"))
 spec = json.loads(subprocess.run([sys.executable, f"{root}/build.py",
                                   "--dump-spec"], capture_output=True,
                                  text=True, check=True).stdout)
+# A state "failed" plan is a loud FAIL row, never a silent skip: the unknown
+# bin name must not pass this gate unnoticed.
+failed = [b.get("error", n) for n, b in sorted(spec["bundles"].items())
+          if b.get("state") == "failed"]
+for err in failed:
+    print(f"FAIL  bundle plan failed: {err}")
+if failed:
+    sys.exit(1)
 sys.path.insert(0, root)
 import build
 
@@ -453,6 +461,12 @@ root, tmp = sys.argv[1:3]
 spec = json.loads(subprocess.run([sys.executable, f"{root}/build.py",
                                   "--dump-spec"], capture_output=True,
                                   text=True, check=True).stdout)
+failed = [b.get("error", n) for n, b in sorted(spec["bundles"].items())
+          if b.get("state") == "failed"]
+for err in failed:
+    print(f"FAIL  bundle plan failed: {err}")
+if failed:
+    sys.exit(1)
 groups = {}
 for n, b in spec["bundles"].items():
     if b.get("state") == "emit" and b.get("regime") == "unversioned":

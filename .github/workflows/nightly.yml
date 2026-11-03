@@ -85,7 +85,9 @@ jobs:
       - name: Build repository
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 build.py
+        # 75 = some packages failed but keep their last published .deb; the
+        # last step of this job turns that into a red run.
+        run: python3 build.py || [ $? -eq 75 ]
 
       - name: Verify the repository is usable
         run: ./test_repo.sh
@@ -150,6 +152,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./test_gcc17.sh
+
+      # build.py exits 75 when a package failed but kept its last published
+      # .deb. The kept packages are fine to serve, so the run goes red here,
+      # with their names, and the notify-failure job opens the issue.
+      - name: Fail on packages that kept their published version
+        run: |
+          set -euo pipefail
+          if [ -s failed-packages.txt ]; then
+            echo "failed packages (kept their last published .deb):"
+            cat failed-packages.txt
+            exit 1
+          fi
 
   notify-failure:
     needs: [build]

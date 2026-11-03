@@ -49,12 +49,15 @@ if [[ $# -gt 0 ]]; then
   want="$*"
 else
   # Default: every advertiseable package EXCEPT compiler bundles (heavy
-  # payloads; S4/S5 own their container tests).
-  want=$(python3 -c "import json
+  # payloads; S4/S5 own their container tests). A kept package's deb is the
+  # old published copy whose pinned payload may be gone after an upstream
+  # rename, so it is skipped here; the failure step after Publish reports it.
+  want=$(python3 -c "import json, os
 s = json.load(open('$spec'))
+skip = set(open('$root/failed-packages.txt').read().split()) if os.path.exists('$root/failed-packages.txt') else set()
 bundles = {n for n, b in s['bundles'].items() if b.get('install') == 'bundle'}
 names = [l.split()[1] for l in open('$repo/Packages') if l.startswith('Package: ')]
-print(' '.join(n for n in names if n != 'diamondinoia-apt' and n not in bundles))")
+print(' '.join(n for n in names if n != 'diamondinoia-apt' and n not in bundles and n not in skip))")
 fi
 # Passthrough packages need a different container than the wrapper flow. Their
 # fork already proved the heavy install (a desktop stack's worth of Depends);

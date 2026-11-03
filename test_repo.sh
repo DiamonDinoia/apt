@@ -212,8 +212,12 @@ fi
 # is pinned to the frozen tests/gcc17-partition.json fixture instead. Docs
 # drift silently; a diff does not. A table the regex fails to find reads as
 # empty and reports every name as missing, so a broken parse cannot pass as
-# agreement.
-if python3 - "$spec" doc/maintaining.md tests/gcc17-partition.json <<'DOC'; then
+# agreement. A failed gcc-17 plan carries no links to compare, so the check
+# steps aside; the keep is reported by the failure step after Publish.
+if [ "$(python3 -c "import json
+print(json.load(open('$spec'))['bundles'].get('gcc-17', {}).get('state', 'emit'))")" = failed ]; then
+  echo "ok    gcc-17's plan failed; the doc partition has no spec side to compare"
+elif python3 - "$spec" doc/maintaining.md tests/gcc17-partition.json <<'DOC'; then
 import json, re, sys
 spec = json.load(open(sys.argv[1]))
 bundle = spec["bundles"]["gcc-17"]
@@ -340,8 +344,13 @@ apt-get "${apt_p[@]}" update -qq 2>/dev/null
 # source lines for that version; ours is the one whose source is this repo,
 # and the glob stanza must put it at 100.
 n100=0
+nran=0
+# A kept package's planned version is not what out/ serves (check 1 binds the
+# kept version), so its row would fail here for the keep alone.
+skiplist="$(dirname "$0")/failed-packages.txt"
 while IFS=$'\t' read -r pkg ver; do
   [ -n "$pkg" ] || continue
+  nran=$((nran + 1))
   if apt-cache "${apt_p[@]}" policy "$pkg" |
      awk -v ver="$ver" -v repo="$repo" '
        $1 == ver && $2 ~ /^[0-9]+$/ { prio=$2; want=1; next }
@@ -355,14 +364,19 @@ while IFS=$'\t' read -r pkg ver; do
     apt-cache "${apt_p[@]}" policy "$pkg" | sed 's/^/         /'
     fail=1
   fi
-done < <(python3 -c "import json
+done < <(python3 -c "import json, os
 s = json.load(open('$spec'))
+skip = set(open('$skiplist').read().split()) if os.path.exists('$skiplist') else set()
 for n, b in sorted(s['bundles'].items()):
-    if b.get('state') == 'emit':
+    if b.get('state') == 'emit' and n not in skip:
         print(n + chr(9) + b['version'])")
 
-if [ "$n100" -lt 1 ]; then
+if [ "$n100" -lt 1 ] && { [ "$nran" -gt 0 ] || [ ! -s "$skiplist" ]; }; then
   echo "FAIL  the 100 stanza covers no offered name (non-vacuity)"; fail=1
+elif [ "$n100" -lt 1 ]; then
+  # Every planned name was kept, so the kept copies (check 1 binds them) are
+  # the only rows left; the failure step after Publish reports each keep.
+  echo "ok    the 100 stanza check has no planned name left to cover ($(grep -c . "$skiplist") names in failed-packages.txt)"
 else
   echo "ok    the 100 stanza covers $n100 offered bundles"
 fi

@@ -46,6 +46,14 @@
 #                         plus mutation positive controls proving the checks
 #                         themselves fire. S4 builds its cutoff section on this
 #                         shape.
+#   7. ctl_keep_published build.py's main() isolation of a failing package:
+#                         the good wrapper still builds, the failing one keeps
+#                         its last published .deb in out/ (newest match only,
+#                         a name-prefix twin never matches), failed-packages.txt
+#                         names only the failure and the run exits 75. Second
+#                         arm: no published copy, so the run aborts on the
+#                         original failure and is not 75. Offline throughout;
+#                         the release lookup is served from a fake.
 #
 # exceptions.json schema (curated + measured; canonical JSON written with
 # json.dumps(indent=2, sort_keys=True) + trailing newline, same as
@@ -766,6 +774,169 @@ ctl_exceptions() {
   stamp ctl_exceptions
 }
 
+# ------------------------------------------------------------ control 7
+# KEEP-PUBLISHED: a failing wrapper must not stop the run or lose its last
+# published .deb. build.py's real main() over a throwaway mini root: one good
+# and one broken wrapper, the release lookup faked. Offline throughout; an
+# unexpected URL aborts the control.
+ctl_keep_published() {
+  echo "==> control 7: keep-published isolation"
+  ROOT="$root" python3 - <<'PYEOF'
+import io
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, os.environ["ROOT"])
+import build
+
+scratch = Path(tempfile.mkdtemp(prefix="ctl-keep-"))
+os.environ.pop("GPG_KEY_ID", None)
+
+# A throwaway mini root: two wrapper specs, an empty catalog (no bundles).
+# build.py reads these module globals at call time, so the real main() path
+# runs untouched against the scratch.
+build.ROOT = scratch
+build.OUT = scratch / "out"
+build.DL = scratch / "dl"
+build.CATALOG = scratch / "catalog.json"
+build.MANIFEST = scratch / "mirror-manifest.json"
+build.EXCEPTIONS = scratch / "exceptions.json"
+build.OUT.mkdir()
+(scratch / "packages.toml").write_text('''
+[ctl-good]
+install = "member"
+repo = "ctl/upstream"
+asset = '^ctl-good-99.tar.gz$'
+member = "ctl-good"
+description = "keep-published control"
+homepage = "https://example.invalid"
+license = "MIT"
+
+[ctl-broken]
+install = "member"
+repo = "ctl/upstream"
+asset = '^ctl-broken-77.tar.gz$'
+member = "ctl-broken"
+description = "keep-published control"
+homepage = "https://example.invalid"
+license = "MIT"
+''')
+(scratch / "catalog.json").write_text(
+    json.dumps({"packaged": [], "trunk_families": {}, "debian": {}}))
+(scratch / "mirror-manifest.json").write_text(
+    json.dumps({"meta": {"repo": "ctl/mirror", "release": "ctl"},
+                "rows": {}}))
+
+def make_deb(name, version):
+    tree = scratch / f"{name}-{version}-tree"
+    (tree / "DEBIAN").mkdir(parents=True)
+    (tree / "DEBIAN" / "control").write_text(
+        f"Package: {name}\nVersion: {version}\nArchitecture: amd64\n"
+        "Maintainer: ctl\nDescription: keep-published control\n")
+    out = scratch / f"{name}_{version}_amd64.deb"
+    subprocess.run(["dpkg-deb", "--root-owner-group", "--build",
+                    str(tree), str(out)], check=True, capture_output=True)
+    return out
+
+# The published copies of ctl-broken: 1.2.3 is the newest, 1.1.0 must not be
+# picked. ctl-broken-bpf is a DIFFERENT package whose name starts with the
+# failing one's: a prefix-sloppy match would keep that instead.
+old_new = make_deb("ctl-broken", "1.2.3")
+old_old = make_deb("ctl-broken", "1.1.0")
+
+# resolve() reads this through its own _RELEASES cache: ctl-good-99.tar.gz
+# resolves, the renamed upstream asset leaves ctl-broken matching nothing.
+build._RELEASES[f"{build.API}/repos/ctl/upstream/releases/latest"] = {
+    "tag_name": "v9.9.9",
+    "assets": [{"name": "ctl-good-99.tar.gz", "digest": "sha256:" + "0" * 64,
+                "browser_download_url":
+                    "https://example.invalid/ctl-good-99.tar.gz"}]}
+
+API_RELEASE = f"{build.API}/repos/{build.SELF}/releases/tags/repo"
+state = {}
+state["listing"] = {"assets": [
+    {"name": old_new.name,
+     "browser_download_url": "https://example.invalid/debs/" + old_new.name},
+    {"name": old_old.name,
+     "browser_download_url": "https://example.invalid/debs/" + old_old.name},
+    {"name": "ctl-broken-bpf_9.9.9_amd64.deb",
+     "browser_download_url":
+         "https://example.invalid/debs/ctl-broken-bpf_9.9.9_amd64.deb"}]}
+state["downloads"] = {
+    "https://example.invalid/debs/" + old_new.name: old_new.read_bytes(),
+    "https://example.invalid/debs/" + old_old.name: old_old.read_bytes()}
+
+def fake_urlopen(req, *args, **kwargs):
+    url = req.full_url if isinstance(req, urllib.request.Request) else req
+    if url == API_RELEASE:
+        return io.BytesIO(json.dumps(state["listing"]).encode())
+    if url in state["downloads"]:
+        return io.BytesIO(state["downloads"][url])
+    raise AssertionError(f"ctl: unexpected network call {url}")
+
+urllib.request.urlopen = fake_urlopen
+
+# Arm 1: the run survives the failure, keeps the newest published copy, and
+# reports exactly the broken package with exit 75.
+rc = build.main()
+assert rc == 75, f"exit code {rc}, want 75"
+out = build.OUT
+assert (out / "ctl-good_9.9.9_amd64.deb").is_file(), "good deb missing"
+assert (out / old_new.name).is_file(), "kept published deb missing"
+assert not (out / old_old.name).exists(), "kept the older published deb"
+assert not (out / "ctl-broken-bpf_9.9.9_amd64.deb").exists(), \
+    "kept the name-prefix twin"
+names = (build.ROOT / "failed-packages.txt").read_text().splitlines()
+assert names == ["ctl-broken"], names
+assert old_new.name in (out / "Packages").read_text(), "index lost the kept deb"
+print("ok    failing wrapper keeps its newest published .deb, run exits 75")
+
+# Arm 2: nothing was ever published for the failing package, so the run must
+# abort on the original resolve failure (never exit 75) and write no report.
+state["listing"] = {"assets": []}
+try:
+    build.main()
+except SystemExit as e:
+    code = e.code if isinstance(e.code, int) else 1
+    assert code != 0 and code != 75, f"exit code {code}"
+    assert "no asset matches" in str(e), f"aborted on {e}, not the original failure"
+else:
+    raise AssertionError("run with no published copy did not abort")
+assert not (build.ROOT / "failed-packages.txt").exists(), "stale report survived"
+print("ok    no published copy: the run aborts on the original failure")
+
+# Arm 3: a transient network error while the recovery path downloads the
+# published listing must retry and still reach exit 75, not abort the run.
+state["listing"] = {"assets": [
+    {"name": old_new.name,
+     "browser_download_url": "https://example.invalid/debs/" + old_new.name},
+    {"name": old_old.name,
+     "browser_download_url": "https://example.invalid/debs/" + old_old.name}]}
+calls = {"n": 0}
+
+def flaky_urlopen(req, *args, **kwargs):
+    url = req.full_url if isinstance(req, urllib.request.Request) else req
+    if url == API_RELEASE:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise urllib.error.URLError(OSError(101, "Network is unreachable"))
+    return fake_urlopen(req, *args, **kwargs)
+
+urllib.request.urlopen = flaky_urlopen
+rc = build.main()
+urllib.request.urlopen = fake_urlopen
+assert rc == 75, f"transient listing error left rc {rc}, want 75"
+assert calls["n"] >= 2, f"the listing answered once ({calls['n']} call); no retry"
+print("ok    a transient listing error retries and the run still exits 75")
+PYEOF
+  stamp ctl_keep_published
+}
+
 # ---------------------------------------------------------------- main
 ctl_mutated_listing
 ctl_version_corpus
@@ -773,11 +944,12 @@ ctl_ghost
 ctl_truncated
 ctl_relr
 ctl_exceptions
+ctl_keep_published
 
 # Stub-out tripwire: a run that skipped a control cannot pass.
 missing=$(comm -13 <(sort "$tmp/stamps") \
   <(printf '%s\n' ctl_truncated ctl_mutated_listing ctl_ghost \
-     ctl_version_corpus ctl_relr ctl_exceptions | sort))
+     ctl_version_corpus ctl_relr ctl_exceptions ctl_keep_published | sort))
 [ -z "$missing" ] || { echo "FAIL  controls did not run: $missing"; exit 1; }
 
 echo "==> all failure-mode controls green ($(wc -l < "$tmp/stamps") controls)"

@@ -182,6 +182,10 @@ A series-wide glob over an unversioned-analog cross family aborts apt with
 `Reached two conflicting assignments`, asserted verbatim by
 `test_compilers.sh`.
 
+A package that fails its rebuild keeps its last published .deb in the index,
+and the run still goes red. The nightly names each such package in
+`failed-packages.txt`, and the failure job opens the issue.
+
 ## Test suites
 
 - `test_repo.sh` runs before anything is published: a throwaway apt

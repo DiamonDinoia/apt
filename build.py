@@ -1323,9 +1323,14 @@ def trunk_bundle_identity(fam: str, rec: dict, row: dict) -> tuple[str, str | No
     raise SystemExit(f"{fam}: no naming rule for rename scheme {scheme!r}")
 
 
-def bundle_plans(catalog: dict, manifest: dict) -> tuple[dict[str, dict], int]:
+def bundle_plans(catalog: dict, manifest: dict, *, isolate: bool = False
+                 ) -> tuple[dict[str, dict], int]:
     """(plans, pending_count). Every catalog compiler entry maps to exactly
-    one bundle plan (emitted iff the mirror carries an analyzed row for it)."""
+    one bundle plan (emitted iff the mirror carries an analyzed row for it).
+    isolate marks a per-bundle failure as a "failed" plan instead of raising,
+    so the nightly can keep that bundle's published .deb and every test reads
+    the failure from the dump. The default still raises, which is what the
+    selftest relies on."""
     rows = manifest["rows"]
     inventory = inventory_names(catalog)
     plans: dict[str, dict] = {}
@@ -1404,28 +1409,35 @@ def bundle_plans(catalog: dict, manifest: dict) -> tuple[dict[str, dict], int]:
                 "smoke": e["smoke"], "served": e["served"],
             }
             continue
-        analysis = row["analysis"]
-        upstream = e["version"] or analysis.get("gcc_version") \
-            or analysis.get("clang_version")
-        if not upstream:
-            raise SystemExit(f"{e['name']}: no version from name or payload")
-        probed = analysis.get("gcc_version") or analysis.get("clang_version")
-        if e["version"] and probed \
-                and version_drift(e["name"], e["family"], e["version"], probed):
-            raise SystemExit(f"{e['name']}: name carries {e['version']} but the "
-                             f"payload probes {probed} — catalog/payload drift")
-        # The defer scheme's <series>~ce<upstream>-R presumes a Debian series,
-        # which starts with a digit. The IBM Advance Toolchain lines carry an
-        # "at12"/"at13" series (no Debian spelling); spell these
-        # <upstream>~ce<series>-R, versions still payload-truthful.
-        version = (f"{e['series']}~ce{upstream}-{BUNDLE_REVISION}"
-                   if e["series"][0].isdigit()
-                   else f"{upstream}~ce{e['series']}-{BUNDLE_REVISION}")
-        plans[e["name"]] = plan(
-            e["name"], family=e["family"], series=e["series"],
-            regime=e["regime"], triplet=e["triplet"], version=version,
-            upstream=upstream, analysis=analysis, asset=row["asset"],
-            sha=row["sha256"], size=row["size"], smoke=e["smoke"])
+        try:
+            analysis = row["analysis"]
+            upstream = e["version"] or analysis.get("gcc_version") \
+                or analysis.get("clang_version")
+            if not upstream:
+                raise SystemExit(f"{e['name']}: no version from name or payload")
+            probed = analysis.get("gcc_version") or analysis.get("clang_version")
+            if e["version"] and probed \
+                    and version_drift(e["name"], e["family"], e["version"],
+                                      probed):
+                raise SystemExit(f"{e['name']}: name carries {e['version']} but the "
+                                 f"payload probes {probed} — catalog/payload drift")
+            # The defer scheme's <series>~ce<upstream>-R presumes a Debian series,
+            # which starts with a digit. The IBM Advance Toolchain lines carry an
+            # "at12"/"at13" series (no Debian spelling); spell these
+            # <upstream>~ce<series>-R, versions still payload-truthful.
+            version = (f"{e['series']}~ce{upstream}-{BUNDLE_REVISION}"
+                       if e["series"][0].isdigit()
+                       else f"{upstream}~ce{e['series']}-{BUNDLE_REVISION}")
+            plans[e["name"]] = plan(
+                e["name"], family=e["family"], series=e["series"],
+                regime=e["regime"], triplet=e["triplet"], version=version,
+                upstream=upstream, analysis=analysis, asset=row["asset"],
+                sha=row["sha256"], size=row["size"], smoke=e["smoke"])
+        except (Exception, SystemExit) as err:
+            if not isolate:
+                raise
+            plans[e["name"]] = {"name": e["name"], "state": "failed",
+                                "error": str(err)}
 
     for fam, rec in sorted(catalog["trunk_families"].items()):
         candidates = [r for r in rows.values()
@@ -1441,15 +1453,23 @@ def bundle_plans(catalog: dict, manifest: dict) -> tuple[dict[str, dict], int]:
                 "smoke": rec["smoke"],
             }
             continue
-        row = max(candidates, key=lambda r: r["date"])
-        name, triplet = trunk_bundle_identity(fam, rec, row)
-        analysis = row["analysis"]
-        upstream = analysis.get("gcc_version") or analysis.get("clang_version")
-        plans[name] = plan(
-            name, family=fam, series=str(row["major"]), regime=rec["regime"],
-            triplet=triplet, version=f"{row['major']}~trunk{row['date']}",
-            upstream=upstream, analysis=analysis, asset=row["asset"],
-            sha=row["sha256"], size=row["size"], smoke=rec["smoke"])
+        name, triplet = fam, rec.get("triplet")
+        try:
+            row = max(candidates, key=lambda r: r["date"])
+            name, triplet = trunk_bundle_identity(fam, rec, row)
+            analysis = row["analysis"]
+            upstream = analysis.get("gcc_version") \
+                or analysis.get("clang_version")
+            plans[name] = plan(
+                name, family=fam, series=str(row["major"]),
+                regime=rec["regime"], triplet=triplet,
+                version=f"{row['major']}~trunk{row['date']}",
+                upstream=upstream, analysis=analysis, asset=row["asset"],
+                sha=row["sha256"], size=row["size"], smoke=rec["smoke"])
+        except (Exception, SystemExit) as err:
+            if not isolate:
+                raise
+            plans[name] = {"name": name, "state": "failed", "error": str(err)}
     return plans, pending
 
 
@@ -1484,7 +1504,7 @@ def pin_stanzas(specs: dict, repos: dict, plans: dict[str, dict]
 
 def resolved_spec(specs: dict, repos: dict) -> dict:
     catalog, manifest, exceptions = load_bundle_inputs()
-    plans, pending = bundle_plans(catalog, manifest)
+    plans, pending = bundle_plans(catalog, manifest, isolate=True)
     bundles = {}
     for name, plan in plans.items():
         if plan["state"] == "emit":
@@ -1767,9 +1787,10 @@ def selftest() -> int:
     # plan_links/classify_bin path. The classifier knobs below are the frozen
     # row's own (native x86_64-linux-gnu, 17.0.0).
     catalog, manifest, _ = load_bundle_inputs()
-    plans, pending = bundle_plans(catalog, manifest)
+    plans, pending = bundle_plans(catalog, manifest, isolate=True)
     p17 = plans.get("gcc-17")
-    if not p17 or p17["state"] != "emit":
+    # "failed" is isolated live drift: skip the emittable expect, run the fixture
+    if not p17 or p17["state"] not in ("emit", "failed"):
         expect("gcc-17 bundle is emittable off the reanalyzed rows", False,
                p17 and p17["state"] or "absent")
     else:
@@ -1796,7 +1817,7 @@ def selftest() -> int:
     rowless = {**manifest,
                "rows": {k: v for k, v in manifest["rows"].items()
                         if k != victim}}
-    reduced, reduced_pending = bundle_plans(catalog, rowless)
+    reduced, reduced_pending = bundle_plans(catalog, rowless, isolate=True)
     expect("a dropped row moves its payload into pending, loudly",
            reduced_pending == pending + 1
            and reduced["gcc-16"]["state"].startswith("pending"),
@@ -2014,6 +2035,41 @@ def index() -> None:
         run(["gpg", "--armor", "--export", key], stdout=f)
 
 
+def keep_published(name: str) -> Path:
+    """Put the newest published .deb of a failed package back into OUT.
+
+    The publish step deletes every release asset missing from out/, so a
+    package that fails its rebuild would lose its last good .deb without this
+    download. Raises when nothing was ever published or the download failed:
+    the caller must abort then, because an empty slot is not a safe stand-in
+    for a package that once existed."""
+    rx = re.compile(rf"{re.escape(name)}_([^_]+)_{ARCH}\.deb")
+    try:
+        with urlopen(
+                http(f"{API}/repos/{SELF}/releases/tags/repo")) as r:
+            assets = [a for a in json.load(r)["assets"]
+                      if rx.fullmatch(a["name"])]
+        if not assets:
+            raise SystemExit(f"{name}: no published "
+                             f"{name}_<version>_{ARCH}.deb on the repo release "
+                             f"to keep")
+        newest = assets[0]
+        for a in assets[1:]:
+            # The asset name spells `~` as `.`, so compare as dpkg does over
+            # the same spelling on both sides.
+            if dpkg_lt(rx.fullmatch(newest["name"])[1],
+                       rx.fullmatch(a["name"])[1]):
+                newest = a
+        with urlopen(
+                http(newest["browser_download_url"])) as r:
+            (OUT / newest["name"]).write_bytes(r.read())
+    except urllib.error.HTTPError as e:
+        raise SystemExit(f"{name}: published-deb lookup returned {e.code}") \
+            from None
+    print(f"  keep    {newest['name']} (last published copy)")
+    return OUT / newest["name"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", action="append", help="build just these packages")
@@ -2031,7 +2087,7 @@ def main() -> int:
         return selftest()
 
     catalog, manifest, _exceptions = load_bundle_inputs()
-    plans, pending = bundle_plans(catalog, manifest)
+    plans, pending = bundle_plans(catalog, manifest, isolate=True)
 
     if args.dump_spec:
         print(json.dumps(resolved_spec(specs, repos), indent=2, sort_keys=True))
@@ -2046,54 +2102,83 @@ def main() -> int:
 
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir()
+    (ROOT / "failed-packages.txt").unlink(missing_ok=True)
+
+    failed: list[str] = []
+
+    def fail(name: str, err: BaseException) -> None:
+        # keep_published raises when no published copy exists: re-raise the
+        # build's own failure then, so a package is never silently dropped.
+        print(f"FAIL {name}: {err}")
+        try:
+            keep_published(name)
+        except (Exception, SystemExit) as keep_err:
+            print(f"  no published copy kept: {keep_err}")
+            raise err from None
+        failed.append(name)
 
     for name, spec in specs.items():
-        info = resolve(name, spec)
-        print(f"{name}: {info['version']}")
-        if spec.get("install") == "passthrough":
-            passthrough(name, info)
-            continue
-        # GitHub rewrites characters it dislikes in a release asset name, and
-        # `~` becomes `.`, which leaves the index pointing at a name that 404s.
-        # The version keeps its `~`; only the file name is spelled safely.
-        deb = f"{name}_{info['version'].replace('~', '.')}_{ARCH}.deb"
-        if not re.fullmatch(r"[A-Za-z0-9._+-]+", deb):
-            raise SystemExit(f"{name}: {deb!r} has characters a release host may rewrite")
-        build(name, spec, info, OUT / deb)
+        try:
+            info = resolve(name, spec)
+            print(f"{name}: {info['version']}")
+            if spec.get("install") == "passthrough":
+                passthrough(name, info)
+                continue
+            # GitHub rewrites characters it dislikes in a release asset name, and
+            # `~` becomes `.`, which leaves the index pointing at a name that 404s.
+            # The version keeps its `~`; only the file name is spelled safely.
+            deb = f"{name}_{info['version'].replace('~', '.')}_{ARCH}.deb"
+            if not re.fullmatch(r"[A-Za-z0-9._+-]+", deb):
+                raise SystemExit(f"{name}: {deb!r} has characters a release host may rewrite")
+            build(name, spec, info, OUT / deb)
+        except (Exception, SystemExit) as err:
+            fail(name, err)
+
+    # A bundle whose planning raised is already marked failed; keep it like a
+    # build failure and name it in the exit-75 report.
+    for name in sorted(plans):
+        if plans[name]["state"] == "failed" \
+                and (not args.only or name in args.only):
+            fail(name, SystemExit(plans[name]["error"]))
 
     for name in sorted(emittable):
         plan = emittable[name]
-        p = plan["payload"]
-        bspec = {
-            "install": "tree",
-            "strip": plan["strip"],
-            "launcher": [plan["launcher"]],
-            "links": plan["links"],
-            "depends": ", ".join(plan["depends"]),
-            "section": "devel",
-            "homepage": plan["homepage"],
-            "description": plan["description"],
-            "license": plan["license"],
-            "_pcr": plan["pcr"] if plan["pcr"] != "none" else None,
-            "_body": " Extracts the Compiler Explorer payload into "
-                     f"/opt/{name} from a staging sibling and checks it\n"
-                     " against a pinned SHA-256. GCC payloads are GPL and the "
-                     "mirror redistributes them; nothing is fetched from a\n"
-                     " third-party bucket at install time.\n",
-            # redistributed bytes: the mirror release is the publisher.
-        }
-        info = {"version": plan["version"], "url": p["url"],
-                "source": p["asset"], "sha256": p["sha256"]}
-        print(f"{name}: {info['version']} (bundle, {p['size_bytes'] >> 20} MiB "
-              f"payload, {len(plan['links']) + 1} links "
-              f"+ {len(plan['link_exclusions'])} excluded)")
-        deb = f"{name}_{info['version'].replace('~', '.')}_{ARCH}.deb"
-        if not re.fullmatch(r"[A-Za-z0-9._+-]+", deb):
-            raise SystemExit(f"{name}: {deb!r} has characters a release host may rewrite")
-        build(name, bspec, info, OUT / deb)
+        try:
+            p = plan["payload"]
+            bspec = {
+                "install": "tree",
+                "strip": plan["strip"],
+                "launcher": [plan["launcher"]],
+                "links": plan["links"],
+                "depends": ", ".join(plan["depends"]),
+                "section": "devel",
+                "homepage": plan["homepage"],
+                "description": plan["description"],
+                "license": plan["license"],
+                "_pcr": plan["pcr"] if plan["pcr"] != "none" else None,
+                "_body": " Extracts the Compiler Explorer payload into "
+                         f"/opt/{name} from a staging sibling and checks it\n"
+                         " against a pinned SHA-256. GCC payloads are GPL and the "
+                         "mirror redistributes them; nothing is fetched from a\n"
+                         " third-party bucket at install time.\n",
+                # redistributed bytes: the mirror release is the publisher.
+            }
+            info = {"version": plan["version"], "url": p["url"],
+                    "source": p["asset"], "sha256": p["sha256"]}
+            print(f"{name}: {info['version']} (bundle, {p['size_bytes'] >> 20} MiB "
+                  f"payload, {len(plan['links']) + 1} links "
+                  f"+ {len(plan['link_exclusions'])} excluded)")
+            deb = f"{name}_{info['version'].replace('~', '.')}_{ARCH}.deb"
+            if not re.fullmatch(r"[A-Za-z0-9._+-]+", deb):
+                raise SystemExit(f"{name}: {deb!r} has characters a release host may rewrite")
+            build(name, bspec, info, OUT / deb)
+        except (Exception, SystemExit) as err:
+            fail(name, err)
     if pending:
         print(f"{pending} catalog payloads not yet mirrored - skipped")
-    if plans and not emittable and not args.only:
+    # A kept failure already put a published .deb in out/, so the repo is not
+    # empty and the run must reach the exit-75 report instead of aborting.
+    if plans and not emittable and not failed and not args.only:
         raise SystemExit("the manifest carries no analyzed catalog row; zero "
                          "compiler bundles emitted — refusing an empty repo")
 
@@ -2106,6 +2191,10 @@ def main() -> int:
     index()
     for p in sorted(OUT.iterdir()):
         print(f"  {p.stat().st_size:>10,}  {p.name}")
+    if failed:
+        (ROOT / "failed-packages.txt").write_text(
+            "".join(f"{n}\n" for n in failed))
+        return 75
     return 0
 
 
