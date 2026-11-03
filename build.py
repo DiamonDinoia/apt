@@ -159,6 +159,32 @@ def http(url: str, *, method: str = "GET") -> urllib.request.Request:
     return req
 
 
+def urlopen(req, opener=None):
+    """Open one URL, retrying only what a retry can fix.
+
+    A momentary network blip (Errno 101 and kin) must not cost a nightly run.
+    An HTTP error below 500 is an answer and raises at once; the last failure
+    re-raises unchanged so callers keep their own error handling.
+    """
+    # Resolved at call time so a caller that replaces urllib.request.urlopen
+    # (ctl_keep_published's shim) still reaches this helper.
+    opener = opener or urllib.request.urlopen
+    for attempt in range(3):
+        try:
+            return opener(req)
+        except urllib.error.HTTPError as e:
+            if e.code < 500:
+                raise
+            err = e
+        except urllib.error.URLError as e:
+            err = e
+        except (TimeoutError, ConnectionError) as e:
+            err = e
+        if attempt < 2:
+            time.sleep(2 << attempt)      # 2s then 4s between tries
+    raise err
+
+
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=True, **kw)
 
@@ -176,7 +202,7 @@ def resolve(name: str, spec: dict) -> dict:
                     else f"{API}/repos/{spec['repo']}/releases/latest")
         if endpoint not in _RELEASES:
             try:
-                with urllib.request.urlopen(http(endpoint)) as r:
+                with urlopen(http(endpoint)) as r:
                     _RELEASES[endpoint] = json.load(r)
             except urllib.error.HTTPError as e:
                 raise SystemExit(f"{name}: {endpoint} returned {e.code}"
@@ -226,11 +252,11 @@ def resolve(name: str, spec: dict) -> dict:
         }
 
     if "json" in spec:
-        with urllib.request.urlopen(http(spec["json"])) as r:
+        with urlopen(http(spec["json"])) as r:
             node = json.load(r)
         for key in spec["json_path"].split("."):
             node = node[int(key)] if key.isdigit() else node[key]
-        with urllib.request.urlopen(http(node["checksumLink"])) as r:
+        with urlopen(http(node["checksumLink"])) as r:
             sha = r.read().split()[0].decode()
         return {
             "version": re.search(spec["version_re"], node["link"]).group(1),
@@ -245,7 +271,7 @@ def resolve(name: str, spec: dict) -> dict:
         # build like the JSON feeds; only payloads are cached. text_re's named
         # groups drive both templates, and an oracle that changes shape fails
         # loudly naming itself rather than pinning a stale version.
-        with urllib.request.urlopen(http(spec["text"])) as r:
+        with urlopen(http(spec["text"])) as r:
             body = r.read().decode()
         match = re.search(spec["text_re"], body)
         if not match:
@@ -262,7 +288,7 @@ def resolve(name: str, spec: dict) -> dict:
 
     # A plain URL that redirects to a versioned path. HEAD is enough to learn
     # the version; the publisher offers no checksum, so one is computed below.
-    with urllib.request.urlopen(http(spec["url"], method="HEAD")) as r:
+    with urlopen(http(spec["url"], method="HEAD")) as r:
         final = r.geturl()
     match = re.search(spec["version_re"], final)
     if not match:
@@ -289,7 +315,7 @@ def fetch(info: dict, *, expected: str | None = None) -> Path:
         path.unlink()
     print(f"  fetch   {info['url']}")
     tmp = path.with_suffix(path.suffix + ".part")
-    with urllib.request.urlopen(http(info["url"])) as r, tmp.open("wb") as f:
+    with urlopen(http(info["url"])) as r, tmp.open("wb") as f:
         shutil.copyfileobj(r, f)
     tmp.rename(path)
     return path
@@ -624,7 +650,7 @@ def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
 
     rx = re.compile(rf"{pkg}_1\.(\d+)\+[0-9a-f]+_all\.deb")
     try:
-        with urllib.request.urlopen(http(f"{API}/repos/{SELF}/releases/tags/repo")) as r:
+        with urlopen(http(f"{API}/repos/{SELF}/releases/tags/repo")) as r:
             assets = [a for a in json.load(r)["assets"] if rx.fullmatch(a["name"])]
     except urllib.error.HTTPError as e:
         if e.code != 404:
@@ -635,7 +661,7 @@ def content_version(pkg: str, tree: Path, suffix: str, floor: int = 0) -> str:
 
     old = max(assets, key=lambda a: int(rx.fullmatch(a["name"])[1]))
     with tempfile.TemporaryDirectory() as d:
-        with urllib.request.urlopen(http(old["browser_download_url"])) as r:
+        with urlopen(http(old["browser_download_url"])) as r:
             Path(d, "old.deb").write_bytes(r.read())
         run(["dpkg-deb", "-x", f"{d}/old.deb", f"{d}/x"])
         run(["dpkg-deb", "-e", f"{d}/old.deb", f"{d}/e"])
@@ -656,7 +682,7 @@ def add_repo(tree: Path, name: str, spec: dict) -> None:
     # and cli.github.com is one. A vendor key needs no credential of ours.
     req = urllib.request.Request(spec["key"],
                                  headers={"User-Agent": "diamondinoia-apt"})
-    blob = urllib.request.urlopen(req).read()
+    blob = urlopen(req).read()
     got = hashlib.sha256(blob).hexdigest()
     if got != spec["key_sha256"]:
         raise SystemExit(f"{name}: key at {spec['key']} hashes {got}, "
@@ -1775,6 +1801,61 @@ def selftest() -> int:
            reduced_pending == pending + 1
            and reduced["gcc-16"]["state"].startswith("pending"),
            f"{pending} -> {reduced_pending}")
+
+    # --- download retry: a transient network error retries 3 times; a 4xx
+    # raises at once (content_version reads 404 as "nothing published").
+    calls: list = []
+
+    def fake_opener(fail_first: int):
+        def opener(req):
+            calls.append(req)
+            if len(calls) <= fail_first:
+                raise urllib.error.URLError(
+                    OSError(101, "Network is unreachable"))
+            return "value"
+        return opener
+
+    real_sleep = time.sleep
+    time.sleep = lambda s: None      # patched: the control runs instantly
+    try:
+        calls.clear()
+        got = urlopen("req", opener=fake_opener(2))
+        expect("urlopen retries URLError and returns the value",
+               got == "value" and len(calls) == 3,
+               f"got={got!r} calls={len(calls)}")
+        calls.clear()
+        try:
+            urlopen("req", opener=fake_opener(3))
+            expect("urlopen re-raises URLError after 3 tries", False,
+                   "no exception")
+        except urllib.error.URLError:
+            expect("urlopen re-raises URLError after 3 tries",
+                   len(calls) == 3, f"calls={len(calls)}")
+        calls.clear()
+
+        def opener404(req):
+            calls.append(req)
+            raise urllib.error.HTTPError(req, 404, "not found", None, None)
+        try:
+            urlopen("req", opener=opener404)
+            expect("urlopen raises HTTPError 404 without retry", False,
+                   "no exception")
+        except urllib.error.HTTPError as e:
+            expect("urlopen raises HTTPError 404 without retry",
+                   e.code == 404 and len(calls) == 1, f"calls={len(calls)}")
+        calls.clear()
+
+        def opener503(req):
+            calls.append(req)
+            if len(calls) == 1:
+                raise urllib.error.HTTPError(req, 503, "down", None, None)
+            return "value"
+        got = urlopen("req", opener=opener503)
+        expect("urlopen retries HTTPError 503 then returns",
+               got == "value" and len(calls) == 2,
+               f"got={got!r} calls={len(calls)}")
+    finally:
+        time.sleep = real_sleep
 
     print("selftest:", "clean" if rc == 0 else "FAILURES above")
     return rc
