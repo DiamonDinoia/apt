@@ -51,3 +51,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./test_precedence.sh --baseline ${{ matrix.baseline }} --legs ${{ github.event.inputs.legs || 'a,b,cfwd,crev' }}
+
+  notify-failure:
+    needs: [suite]
+    if: failure() || cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue or comment on the open one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+          RESULT: failed
+        run: |
+          issue=$(gh issue list --label validate-precedence-failure --state open --json number -q '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "@$OWNER Workflow run $RESULT (event: $EVENT): $RUN_URL"
+          else
+            gh label create validate-precedence-failure --color B60205 --force
+            gh issue create --title "validate-precedence failed" --label validate-precedence-failure --assignee "$OWNER" --body "@$OWNER Workflow run $RESULT (event: $EVENT): $RUN_URL"
+          fi

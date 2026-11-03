@@ -128,3 +128,27 @@ jobs:
             2) echo "pending remainder: re-dispatch for the next chunk" ;;
             *) echo "drift: mirror.py check exited $rc; needs a human" >&2; exit 1 ;;
           esac
+
+  notify-failure:
+    needs: [sync]
+    if: failure() || cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue or comment on the open one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+          RESULT: failed
+        run: |
+          issue=$(gh issue list --label bulk-sync-failure --state open --json number -q '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "@$OWNER Workflow run $RESULT (event: $EVENT): $RUN_URL"
+          else
+            gh label create bulk-sync-failure --color B60205 --force
+            gh issue create --title "bulk-sync failed" --label bulk-sync-failure --assignee "$OWNER" --body "@$OWNER Workflow run $RESULT (event: $EVENT): $RUN_URL"
+          fi
