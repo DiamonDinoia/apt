@@ -8,7 +8,10 @@ ldd.pairs,bin.present}) and:
 
   - prints every job's report lines,
   - asserts the ldd sweep BOTH directions (E13): a surprise not-found fails
-    as hard as a recorded exception unexpectedly resolving,
+    as hard as a recorded exception unexpectedly resolving, except a
+    not-found pair whose soname the bundle's dump-spec classes
+    payload-internal (meta internal_sonames): allowed for every bundle,
+    never required, so recorded and Go-helper rows keep both directions,
   - asserts the bin/ accounting both directions,
   - asserts the payload-readelf arch evidence for cross jobs,
   - treats MISSING output artifacts as their own FAIL class: a job that
@@ -151,6 +154,13 @@ def collect_jobs(tmp, names, bases, emit=print):
                     fail(f"{name}/{base}: ambiguous (basename, soname) "
                          f"duplicates in the sweep: {sorted(bp)}")
                 surprise, missing = ldd_diff(bp, meta["expect"])
+                # payload-internal sonames may stay not-found (the loader path
+                # never carries the payload prefix) without a record row:
+                # allowed, never required. Only the surprise side is
+                # filtered, so recorded and Go-helper rows stay required.
+                internal = set(meta["internal_sonames"])
+                allowed = [pr for pr in surprise if pr[1] in internal]
+                surprise = [pr for pr in surprise if pr[1] not in internal]
                 if surprise:
                     fail(f"{name}/{base}: ldd sweep surprise not-found: "
                          f"{surprise}")
@@ -159,7 +169,9 @@ def collect_jobs(tmp, names, bases, emit=print):
                          f"resolved: {missing}")
                 if not surprise and not missing and len(set(bp)) == len(bp):
                     emit(f"      {name}/{base}: ldd sweep exact "
-                         f"({len(bp)} exception pair(s), 0 surprises)")
+                         f"({len(bp) - len(allowed)} exception pair(s), "
+                         f"{len(allowed)} payload-internal allowed, "
+                         f"0 surprises)")
 
                 present = [l.strip() for l in open(f"{d}/out/bin.present")
                            if l.strip()]
@@ -290,7 +302,14 @@ def main(root, tmp):
                 bp = sorted({(os.path.basename(f), s.strip())
                              for f, s in
                              (l.split("\t", 1) for l in open(p) if "\t" in l)})
-                tag = "MATCHES record" if bp == want \
+                # the verdict's payload-internal allowance applies here too:
+                # such a pair is not a record row and must not read DIFFERS
+                internal = set(json.load(open(
+                    f"{tmp}/jobs/{name}.{base}/expect.json"))
+                    ["internal_sonames"])
+                kept = [pr for pr in bp
+                        if pr in set(want) or pr[1] not in internal]
+                tag = "MATCHES record" if kept == want \
                     else "DIFFERS from record"
                 print(f"==> LDD-MEASURED {name}/{base}: measured {bp} "
                       f"({tag}; recorded {len(want)} pair(s))")
@@ -338,6 +357,7 @@ def main(root, tmp):
 
 def _synthetic_meta(expect=None):
     return {"expect": expect or [],
+            "internal_sonames": [],
             "bin": {"launcher": "bin/gcc", "links": ["bin/gcc-ar"],
                     "exclusions": []},
             "expected_arch": "Advanced Micro Devices X86-64",
@@ -352,6 +372,11 @@ def _write_job(tmp, name, base, meta):
     os.makedirs(d, exist_ok=True)
     json.dump(meta, open(f"{d}/expect.json", "w"))
     return d
+
+
+def _write_sweep(d, pairs):
+    open(f"{d}/out/ldd.pairs", "w").write(
+        "".join(f"usr/lib/{a}\t{s}\n" for a, s in pairs))
 
 
 def _collect_status(tmp):
@@ -495,6 +520,77 @@ def selftest() -> int:
         r = _collect_status(t)
         check(r.returncode != 0 and "ok(refused)" not in r.stdout,
               "refusal job with a primary failure stays red")
+
+    # Arm 9 (case a, payload-internal allowance): clang-24's sweep carries
+    # sycl-ls -> libLLVMSYCL.so.0.1.0, a soname build.py classes
+    # payload-internal. It passes without a record row (allowed), with no
+    # surprise and no missing against the record's other 5 rows.
+    rec5 = [["libc++.so.1.0", "libatomic.so.1"],
+            ["libc++.so.1.0", "libc++abi.so.1"],
+            ["libc++.so.1.0", "libunwind.so.1"],
+            ["libc++abi.so.1.0", "libunwind.so.1"],
+            ["ompdModule.so", "libpython3.10.so.1.0"]]
+    sycl = ["sycl-ls", "libLLVMSYCL.so.0.1.0"]
+    with tempfile.TemporaryDirectory() as t:
+        meta = _synthetic_meta(expect=rec5)
+        meta["internal_sonames"] = ["libLLVMSYCL.so.0.1.0"]
+        d = _write_job(t, "clang-24", "sid", meta)
+        os.makedirs(f"{d}/out")
+        open(f"{d}/out/report", "w").write("ok    install clang-24\n")
+        open(f"{d}/out/rc", "w").write("0")
+        _write_sweep(d, rec5 + [sycl])
+        open(f"{d}/out/bin.present", "w").write("gcc\ngcc-ar\n")
+        open(f"{t}/shard.tsv", "w").write("clang-24\n")
+        open(f"{t}/bases", "w").write("sid\n")
+        r = _collect_status(t)
+        check(r.returncode == 0 and "not-found" not in r.stdout
+              and "unexpectedly resolved" not in r.stdout
+              and "1 payload-internal allowed" in r.stdout
+              and "Traceback" not in r.stderr,
+              "payload-internal not-found pair is allowed: no surprise, "
+              "no missing")
+
+    # Arm 10 (case b): the allowance does not swallow a pair the bundle does
+    # not own. Same sweep plus a foreign pair still fails as a surprise, and
+    # the FAIL row names only the foreign pair.
+    with tempfile.TemporaryDirectory() as t:
+        meta = _synthetic_meta(expect=rec5)
+        meta["internal_sonames"] = ["libLLVMSYCL.so.0.1.0"]
+        d = _write_job(t, "clang-24", "sid", meta)
+        os.makedirs(f"{d}/out")
+        open(f"{d}/out/report", "w").write("ok    install clang-24\n")
+        open(f"{d}/out/rc", "w").write("0")
+        _write_sweep(d, rec5 + [sycl, ["foo", "libnotours.so.1"]])
+        open(f"{d}/out/bin.present", "w").write("gcc\ngcc-ar\n")
+        open(f"{t}/shard.tsv", "w").write("clang-24\n")
+        open(f"{t}/bases", "w").write("sid\n")
+        r = _collect_status(t)
+        check(r.returncode != 0
+              and "surprise not-found: [('foo', 'libnotours.so.1')]"
+              in r.stdout
+              and "unexpectedly resolved" not in r.stdout
+              and "Traceback" not in r.stderr,
+              "a foreign not-found pair still fails as a surprise")
+
+    # Arm 11 (case c): the allowance is not a requirement. The sweep without
+    # the sycl-ls pair passes against the same 5-row record.
+    with tempfile.TemporaryDirectory() as t:
+        meta = _synthetic_meta(expect=rec5)
+        meta["internal_sonames"] = ["libLLVMSYCL.so.0.1.0"]
+        d = _write_job(t, "clang-24", "sid", meta)
+        os.makedirs(f"{d}/out")
+        open(f"{d}/out/report", "w").write("ok    install clang-24\n")
+        open(f"{d}/out/rc", "w").write("0")
+        _write_sweep(d, rec5)
+        open(f"{d}/out/bin.present", "w").write("gcc\ngcc-ar\n")
+        open(f"{t}/shard.tsv", "w").write("clang-24\n")
+        open(f"{t}/bases", "w").write("sid\n")
+        r = _collect_status(t)
+        check(r.returncode == 0 and "not-found" not in r.stdout
+              and "unexpectedly resolved" not in r.stdout
+              and "Traceback" not in r.stderr,
+              "payload-internal pair absent from the sweep: still passes "
+              "(allowed, not required)")
 
     print("collector selftest:", "clean" if rc == 0 else "FAILURES above")
     return rc

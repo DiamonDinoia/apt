@@ -1049,6 +1049,7 @@ if not native:
     open(f"{d}/payload_objdump", "w").write(bt("objdump"))
 
 meta = {"expect": expect,
+        "internal_sonames": cfg["internal_sonames"],
         "bin": {"launcher": cfg["launcher"],
                 "links": sorted(cfg["links"].values()),
                 "exclusions": sorted(cfg["link_exclusions"])},
