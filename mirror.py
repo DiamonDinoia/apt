@@ -262,21 +262,31 @@ def pace() -> None:
 def gh(args: list[str], mutating: bool = False, stdin: str | None = None,
        retries: int = 3) -> str:
     """Run gh, pacing mutations and honouring 429/403 backoff ourselves:
-    gh treats them as permanent and does not retry."""
+    gh treats them as permanent and does not retry. 5xx and empty or
+    truncated replies are retried on a short backoff, but uploads are
+    never retried: a half-landed re-POST 422s already_exists."""
+    upload = "uploads.github.com" in " ".join(args)
     for attempt in range(retries + 1):
         if mutating:
             pace()
         p = subprocess.run(["gh"] + args, input=stdin, capture_output=True, text=True)
         if p.returncode == 0:
             return p.stdout
+        out = p.stderr + p.stdout
         wait = None
-        m = re.search(r"HTTP (429|403)\b", p.stderr + p.stdout)
+        reason = None
+        m = re.search(r"HTTP (429|403)\b", out)
         if m:
-            r = re.search(r"(?i)retry[- ]after\D*(\d+)", p.stderr + p.stdout)
+            r = re.search(r"(?i)retry[- ]after\D*(\d+)", out)
             wait = max(60, int(r.group(1))) if r else 60
+            reason = f"HTTP {m.group(1)}"
+        elif not upload and re.search(
+                r"HTTP 5\d\d|unexpected (end of JSON input|EOF)", out):
+            wait = 5 * (attempt + 1)
+            reason = "transient 5xx or empty reply"
         if wait is None or attempt == retries:
             raise RuntimeError(f"gh {' '.join(args)} failed:\n{p.stderr.strip()}")
-        print(f"  gh got HTTP {m.group(1)}; backing off {wait}s "
+        print(f"  gh got {reason}; backing off {wait}s "
               f"(attempt {attempt + 1}/{retries})", file=sys.stderr)
         time.sleep(wait)
     raise AssertionError("unreachable")
@@ -2193,6 +2203,82 @@ def cmd_selftest() -> int:
            str(pend))
     expect("fixture decision: --complete gives 2",
            check_decision([], pend, True) == 2)
+
+    # ---------------- gh(): 5xx and empty/truncated replies retry briefly,
+    # uploads never retry, 429 keeps the long backoff (run 41817386028)
+    import subprocess as _subprocess
+    _real_run, _real_sleep = _subprocess.run, time.sleep
+
+    class _FakeP:
+        def __init__(self, rc, out="", err=""):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    def _gh_case(args, seq, retries=3):
+        """Drive gh() with faked subprocess.run + time.sleep; return
+        (raised, result, calls, sleeps). A run call beyond the seeded
+        results fails loudly."""
+        calls, sleeps, queue = [], [], list(seq)
+
+        def _run(cmd, **kw):
+            calls.append(cmd)
+            if not queue:
+                raise AssertionError("gh() called subprocess.run more "
+                                     f"times than the case seeded ({len(seq)})")
+            return queue.pop(0)
+
+        def _sleep(s):
+            sleeps.append(s)
+
+        _subprocess.run, time.sleep = _run, _sleep
+        try:
+            try:
+                return False, gh(args, retries=retries), calls, sleeps
+            except RuntimeError:
+                return True, None, calls, sleeps
+        finally:
+            _subprocess.run, time.sleep = _real_run, _real_sleep
+
+    empty_json = _FakeP(1, err="unexpected end of JSON input")
+    http502 = _FakeP(1, err="gh: HTTP 502")
+    ok = lambda s: _FakeP(0, out=s)
+    # (1) empty-JSON reply twice, then success -> 3 calls, backoff 5 then 10
+    raised, res, calls, sleeps = _gh_case(
+        ["api", "repos/x/releases/tags/v1"],
+        [empty_json, empty_json, ok('{"id": 1}')])
+    expect("gh retries an empty-JSON reply then succeeds",
+           (not raised) and res == '{"id": 1}' and len(calls) == 3
+           and sleeps == [5, 10],
+           f"raised={raised} res={res!r} calls={len(calls)} sleeps={sleeps}")
+    # (2) HTTP 502 on every try -> RuntimeError after retries+1 calls
+    raised, res, calls, sleeps = _gh_case(
+        ["api", "repos/x/releases/tags/v1"],
+        [http502] * 3, retries=2)
+    expect("gh gives up on a persistent HTTP 502",
+           raised and len(calls) == 3 and sleeps == [5, 10],
+           f"raised={raised} calls={len(calls)} sleeps={sleeps}")
+    # (3) HTTP 404 -> RuntimeError after 1 call (not transient)
+    raised, res, calls, sleeps = _gh_case(
+        ["api", "repos/x/releases/assets/1", "-X", "DELETE"],
+        [_FakeP(1, err="gh: HTTP 404")])
+    expect("gh does not retry HTTP 404",
+           raised and len(calls) == 1 and sleeps == [],
+           f"raised={raised} calls={len(calls)} sleeps={sleeps}")
+    # (4) uploads.github.com + HTTP 502 -> RuntimeError after 1 call (no retry)
+    raised, res, calls, sleeps = _gh_case(
+        ["api", "https://uploads.github.com/repos/x/releases/1/assets?name=a",
+         "-X", "POST"],
+        [http502])
+    expect("gh never retries an upload, even on HTTP 502",
+           raised and len(calls) == 1 and sleeps == [],
+           f"raised={raised} calls={len(calls)} sleeps={sleeps}")
+    # (5) HTTP 429 path still retries on the long backoff
+    raised, res, calls, sleeps = _gh_case(
+        ["api", "repos/x/releases/tags/v1"],
+        [_FakeP(1, err="gh: HTTP 429: rate limited"), ok("OK429")])
+    expect("gh still retries HTTP 429 on the long backoff",
+           (not raised) and res == "OK429" and len(calls) == 2
+           and sleeps == [60],
+           f"raised={raised} res={res!r} calls={len(calls)} sleeps={sleeps}")
 
     print("selftest:", "clean" if rc == 0 else "FAILURES above")
     return rc
