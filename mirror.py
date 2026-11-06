@@ -175,6 +175,11 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+# build.urlopen is the shared retry helper (5xx, URLError, timeout, with
+# exponential backoff): every fetch below goes through it, so one flaky host
+# answer is not ground truth.
+import build
+
 ROOT = Path(__file__).parent
 CATALOG = Path(os.environ.get("MIRROR_CATALOG", ROOT / "catalog.json"))
 MANIFEST = Path(os.environ.get("MIRROR_MANIFEST", ROOT / "mirror-manifest.json"))
@@ -213,15 +218,17 @@ EM_NAMES = {3: "i386", 4: "m68k", 8: "mips", 15: "parisc", 18: "sparc32plus",
 
 def fetch(url: str, timeout: int = TIMEOUT) -> bytes:
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    opener = lambda r: urllib.request.urlopen(r, timeout=timeout)
+    with build.urlopen(req, opener=opener) as r:
         return r.read()
 
 
 def http_head(url: str) -> dict | None:
     """size+etag of a payload, None when the key is gone."""
     req = urllib.request.Request(url, method="HEAD", headers=UA)
+    opener = lambda r: urllib.request.urlopen(r, timeout=60)
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with build.urlopen(req, opener=opener) as r:
             return {"size": int(r.headers["Content-Length"]),
                     "etag": r.headers.get("ETag", "")}
     except urllib.error.HTTPError as e:
@@ -263,7 +270,8 @@ def gh(args: list[str], mutating: bool = False, stdin: str | None = None,
        retries: int = 3) -> str:
     """Run gh, pacing mutations and honouring 429/403 backoff ourselves:
     gh treats them as permanent and does not retry. 5xx and empty or
-    truncated replies are retried on a short backoff, but uploads are
+    truncated replies are retried on a short doubling backoff, but
+    uploads are
     never retried: a half-landed re-POST 422s already_exists."""
     upload = "uploads.github.com" in " ".join(args)
     for attempt in range(retries + 1):
@@ -282,7 +290,7 @@ def gh(args: list[str], mutating: bool = False, stdin: str | None = None,
             reason = f"HTTP {m.group(1)}"
         elif not upload and re.search(
                 r"HTTP 5\d\d|unexpected (end of JSON input|EOF)", out):
-            wait = 5 * (attempt + 1)
+            wait = 5 << attempt
             reason = "transient 5xx or empty reply"
         if wait is None or attempt == retries:
             raise RuntimeError(f"gh {' '.join(args)} failed:\n{p.stderr.strip()}")
@@ -563,14 +571,16 @@ def sha256_path(path: Path) -> str:
 
 def download(key: str, dest: Path) -> None:
     req = urllib.request.Request(BUCKET + key, headers=UA)
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r, open(dest, "wb") as f:
+    opener = lambda r: urllib.request.urlopen(r, timeout=TIMEOUT)
+    with build.urlopen(req, opener=opener) as r, open(dest, "wb") as f:
         while chunk := r.read(4 << 20):
             f.write(chunk)
 
 
 def download_url(url: str, dest: Path) -> None:
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r, open(dest, "wb") as f:
+    opener = lambda r: urllib.request.urlopen(r, timeout=TIMEOUT)
+    with build.urlopen(req, opener=opener) as r, open(dest, "wb") as f:
         while chunk := r.read(4 << 20):
             f.write(chunk)
 
@@ -619,8 +629,8 @@ def fetch_referenced_payloads(base: str = INDEX_URL,
     fetches (Exception covers URLError, HTTPError, IncompleteRead,
     ValueError, UnicodeDecodeError)."""
     def get(suffix: str) -> bytes:
-        with opener(urllib.request.Request(base + suffix, headers=UA),
-                    timeout=TIMEOUT) as r:
+        req = urllib.request.Request(base + suffix, headers=UA)
+        with build.urlopen(req, opener=lambda r: opener(r, timeout=TIMEOUT)) as r:
             return r.read()
     try:
         rel = get("Release").decode("utf-8")

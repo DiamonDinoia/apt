@@ -227,7 +227,7 @@ set -e
 [ "$1" = configure ] || exit 0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-curl -fsSL 'file:///repo/Packages' -o "$tmp/payload"
+curl -fsSL 'file:///repo/Packages' -o "$tmp/payload" --retry 5
 echo '0000000000000000000000000000000000000000000000000000000000000000  '"$tmp/payload" | sha256sum -c - >/dev/null
 CONTROL
 chmod 755 /tmp/bad/DEBIAN/postinst

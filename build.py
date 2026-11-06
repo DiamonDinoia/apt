@@ -336,7 +336,7 @@ set -e
 [ "$1" = configure ] || exit 0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-curl -fsSL '{url}' -o "$tmp/payload"
+curl -fsSL '{url}' -o "$tmp/payload" --retry 5
 echo '{sha}  '"$tmp/payload" | sha256sum -c - >/dev/null
 """
 
@@ -1837,7 +1837,8 @@ def selftest() -> int:
         return opener
 
     real_sleep = time.sleep
-    time.sleep = lambda s: None      # patched: the control runs instantly
+    sleeps: list = []
+    time.sleep = sleeps.append       # patched: record the backoff, spend none
     try:
         calls.clear()
         got = urlopen("req", opener=fake_opener(2))
@@ -1875,6 +1876,10 @@ def selftest() -> int:
         expect("urlopen retries HTTPError 503 then returns",
                got == "value" and len(calls) == 2,
                f"got={got!r} calls={len(calls)}")
+        # A burst of 504s must not hammer the host at a fixed cadence: the
+        # backoff between attempts doubles. Two sleeps per 3-attempt try.
+        expect("urlopen backoff doubles per attempt (2s, 4s)",
+               sleeps == [2, 4, 2, 4, 2], f"sleeps={sleeps}")
     finally:
         time.sleep = real_sleep
 

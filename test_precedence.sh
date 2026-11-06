@@ -385,7 +385,7 @@ PY
     done < "$work/payloads.map" > "$work/payloads.sums"
     while IFS=$'\t' read -r name url sha asset; do
         [ -f "$work/payloads/$asset" ] ||
-            curl -fsSL "${auth[@]+"${auth[@]}"}" "$url" -o "$work/payloads/$asset" &
+            curl -fsSL "${auth[@]+"${auth[@]}"}" "$url" -o "$work/payloads/$asset" --retry 5 &
     done < "$work/payloads.map"
     wait
     sha256sum -c "$work/payloads.sums" > /dev/null || {
@@ -405,6 +405,7 @@ url=; out=
 while [ $# -gt 0 ]; do
     case $1 in
         -o) out=$2; shift 2;;
+        --retry) shift 2;;   # value flag: the postinst's own retry policy
         -*) shift;;
         *)  url=$1; shift;;
     esac
@@ -414,7 +415,7 @@ if [ -n "$asset" ] && [ -f "/payloads/$asset" ]; then
     cp "/payloads/$asset" "$out"
     exit 0
 fi
-exec /usr/bin/curl -fsSL "$url" -o "$out"
+exec /usr/bin/curl -fsSL "$url" -o "$out" --retry 5
 SH
 chmod 755 "$work/lib/curl-shim"
 

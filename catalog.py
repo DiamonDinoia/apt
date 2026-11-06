@@ -118,6 +118,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import build
+
 ROOT = Path(__file__).parent
 CATALOG = ROOT / "catalog.json"
 
@@ -233,7 +235,8 @@ NAMED_SKIP_KEYS = {
 
 def fetch(url: str, timeout: int = 120) -> bytes:
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    opener = lambda r: urllib.request.urlopen(r, timeout=timeout)
+    with build.urlopen(req, opener=opener) as r:
         return r.read()
 
 

@@ -48,7 +48,7 @@ apt-get -qq install -y --no-install-recommends \
     curl ca-certificates dpkg-dev python3-minimal >/dev/null
 
 echo "== bootstrap package installs the key, the source and the pin"
-curl -fsSL "$boot" -o /tmp/boot.deb
+curl -fsSL "$boot" -o /tmp/boot.deb --retry 5
 
 # The route a user is on: an older bootstrap already installed, reached only by
 # `apt upgrade`. Installing /tmp/boot.deb by path skips version comparison, so

@@ -47,8 +47,8 @@ The wrappers and the fork-built debs:
 One package installs the key, the source and the pin file:
 
     base=https://github.com/DiamonDinoia/apt/releases/download/repo
-    deb=$(curl -fsSL $base/Packages | sed -n 's/^Filename: \(diamondinoia-apt_.*\)$/\1/p')
-    curl -fsSLO "$base/$deb"
+    deb=$(curl -fsSL $base/Packages --retry 5 | sed -n 's/^Filename: \(diamondinoia-apt_.*\)$/\1/p')
+    curl -fsSLO "$base/$deb" --retry 5
     sudo apt-get install ./"$deb"
     sudo apt-get update
 

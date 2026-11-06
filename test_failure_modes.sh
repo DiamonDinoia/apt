@@ -151,7 +151,7 @@ import json
 meta = json.load(open('$root/mirror-manifest.json'))['meta']
 print(f\"https://github.com/{meta['repo']}/releases/download/{meta['release']}/$asset\")")
   echo "==> fetch $asset"
-  curl -fsSL -o "$out.part" "$url"
+  curl -fsSL -o "$out.part" "$url" --retry 5
   echo "$want  $out.part" | sha256sum -c --status - || {
     echo "FAIL  $asset: mirrored bytes no longer match the manifest sha256"
     exit 1; }

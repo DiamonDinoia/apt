@@ -50,6 +50,12 @@ apt=(-o Dir::Etc::sourcelist=/dev/null
      -o Dir::Etc::preferencesparts=/dev/null
      -o APT::Get::AllowUnauthenticated=true)
 
+# The retry flags every curl in this file carries: a release host that flakes
+# with 504s must not read as a dead payload (issue 5). Shared with the
+# transient control in check 2, which has to test the probe's real command.
+# Exported: the probe runs in an xargs child.
+export CURL_RETRY="--retry 5"
+
 if ! apt-get "${apt[@]}" update -qq 2>"$work/err"; then
   echo "FAIL  apt update rejected the repository"; cat "$work/err"; exit 1
 fi
@@ -116,7 +122,7 @@ xargs -0 -r -n 3 -P 8 bash -c '
     printf "FAIL  %-18s pinned hash is %q, not a SHA-256\n" "$pkg" "$sha"
     exit 1
   fi
-  if ! code=$(curl -fsSLI -o /dev/null -w "%{http_code}" --max-time 30 "$url"); then
+  if ! code=$(curl -fsSLI -o /dev/null -w "%{http_code}" --max-time 30 $CURL_RETRY "$url"); then
     printf "FAIL  %-18s payload unreachable: %s\n" "$pkg" "$url"
     exit 1
   fi
@@ -127,12 +133,46 @@ grep -q '^FAIL' "$work/probe-out" && fail=1
 
 # Positive control for check 2: the reachability probe must fail on a URL that
 # does not resolve, or a dead payload would pass unnoticed.
-if curl -fsSLI -o /dev/null --max-time 30 \
+if curl -fsSLI -o /dev/null --max-time 30 $CURL_RETRY \
      https://github.com/DiamonDinoia/apt/releases/download/repo/no-such-asset 2>/dev/null; then
   echo "FAIL  positive control: curl accepted a missing payload"
   fail=1
 else
   echo "ok    positive control: missing payload rejected"
+fi
+
+# Transient control for check 2: the release host once answered 504 to a whole
+# burst of probes, and the nightly read one flaked host as a dead payload
+# (issue 5). A local server answers 504, 504, 200 on loopback, and the
+# probe's exact command with the shared flags must exit 0. Offline: no
+# payload, no host.
+if python3 - "$CURL_RETRY" <<'FLAKY'; then
+import http.server, subprocess, sys, threading
+
+flags = sys.argv[1].split()
+hits = {"n": 0}
+
+class H(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        hits["n"] += 1
+        self.send_response(504 if hits["n"] <= 2 else 200)
+        self.send_header("Content-Length", "1")
+        self.end_headers()
+    do_GET = do_HEAD
+    def log_message(self, *a):
+        pass
+
+srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+url = "http://127.0.0.1:%d/payload.tar.xz" % srv.server_address[1]
+p = subprocess.run(["curl", "-fsSLI", "-o", "/dev/null", "-w", "%{http_code}",
+                    "--max-time", "30"] + flags + [url], capture_output=True)
+srv.shutdown()
+sys.exit(0 if p.returncode == 0 and p.stdout.strip() == b"200" else 1)
+FLAKY
+  echo "ok    transient control: 504, 504, 200 rides out, the probe passes"
+else
+  echo "FAIL  transient control: a host flaking with 504s reads as a dead payload"; fail=1
 fi
 
 # Check 4. Every Filename in the index has to survive the release host, which
@@ -172,13 +212,13 @@ cp "$work/Packages.bak" "$repo/Packages"
 boot=$(cd "$repo" && echo diamondinoia-apt_*_all.deb)
 new_v=${boot#diamondinoia-apt_}; new_v=${new_v%_all.deb}
 url=https://github.com/DiamonDinoia/apt/releases/download/repo
-old_b=$(curl -fsSL "$url/Packages" |
+old_b=$(curl -fsSL $CURL_RETRY "$url/Packages" |
         awk '/^Filename: diamondinoia-apt_/{ print $2 }')
 if [ -z "$old_b" ]; then
   echo "FAIL  the published index advertises no bootstrap package"; fail=1
 else
   old_v=${old_b#diamondinoia-apt_}; old_v=${old_v%_all.deb}
-  curl -fsSL -o "$work/old.deb" "$url/$old_b"
+  curl -fsSL -o "$work/old.deb" $CURL_RETRY "$url/$old_b"
   dpkg-deb -x "$work/old.deb" "$work/old"
   dpkg-deb -x "$repo/$boot" "$work/new"
   # Different files must raise the version, or the change reaches nobody. An
@@ -646,6 +686,63 @@ if doccheck_strings "$work/readme-mut" >/dev/null 2>&1; then
   fail=1
 else
   echo "ok    positive control: a doctored failure string is refused"
+fi
+
+# Check 17: every network fetch in the tracked sources retries transient
+# errors, so a 504 from a release host reds no run (issue 5). Every tracked
+# text file is scanned (binary files are skipped), so a curl in a README, a
+# workflow or a new file type cannot slip past. A curl invocation without
+# --retry fails; --retry-delay would switch curl off its exponential backoff,
+# so a line carrying it fails too; the shared $CURL_RETRY form passes only
+# where the file defines it with the literal. A Python file that opens a URL
+# with a bare urllib.request.urlopen( instead of the shared build.urlopen
+# retry helper fails, and so do a bare urlopen( call and an import of
+# urlopen; the only exempt form is the opener assignment
+# `= lambda PARAM: urllib.request.urlopen(` the fetchers pass to
+# build.urlopen. build.py defines the shared helper, so its bare urlopen(
+# calls are helper calls.
+if python3 - <<'CURLGUARD'; then
+import os, re, subprocess, sys
+
+INVOKE = re.compile(r"^\s*(?:-?\s*run:\s*)?(?:if\s+)?curl -|\$\((?:if\s+)?curl -|exec\s+/usr/bin/curl -")
+HAS_RETRY = re.compile(r"--retry(?!-)(?:[0-9]+|\s|$)")
+RAW_OPEN = re.compile(r"urllib\.request\.urlopen\(")
+SANCTIONED = re.compile(r"^\s*\w+\s*=\s*lambda\s+\w+\s*:\s*urllib\.request\.urlopen\(")
+BARE_OPEN = re.compile(r"(?<![\w.])urlopen\(")
+URLOPEN_IMPORT = re.compile(r"^\s*from\s+urllib\.request\s+import\b.*\burlopen\b")
+bad = []
+files = subprocess.run(["git", "ls-files"], capture_output=True,
+                       text=True, check=True).stdout.split()
+for f in files:
+    raw = open(f, "rb").read()
+    if b"\x00" in raw[:8192]:
+        continue  # binary: cannot hold a curl line or a fetch
+    text = raw.decode("utf-8", "replace")
+    if "$CURL_RETRY" in text and not re.search(r'CURL_RETRY="--retry [0-9]+"', text):
+        bad.append(f"{f}: uses $CURL_RETRY but does not define it with --retry")
+    for i, line in enumerate(text.splitlines(), 1):
+        if INVOKE.search(line):
+            if "--retry-delay" in line:
+                bad.append(f"{f}:{i}: --retry-delay switches curl off exponential backoff")
+            elif not HAS_RETRY.search(line) and "$CURL_RETRY" not in line:
+                bad.append(f"{f}:{i}: no --retry: {line.strip()}")
+        if f.endswith(".py"):
+            if RAW_OPEN.search(line):
+                if not SANCTIONED.match(line):
+                    bad.append(f"{f}:{i}: bare urllib.request.urlopen( bypasses build.urlopen")
+            # shortcut: only the module that defines the shared helper is
+            # exempt from the bare-call rule; move the helper and move this.
+            if os.path.basename(f) != "build.py" and BARE_OPEN.search(line):
+                bad.append(f"{f}:{i}: bare urlopen( bypasses build.urlopen")
+            if URLOPEN_IMPORT.match(line):
+                bad.append(f"{f}:{i}: from urllib.request import urlopen bypasses build.urlopen")
+for b in bad:
+    print("      " + b)
+sys.exit(bool(bad))
+CURLGUARD
+  echo "ok    every network fetch in the tracked sources retries transient errors"
+else
+  echo "FAIL  a network fetch can still die on one transient error"; fail=1
 fi
 
 exit $fail
