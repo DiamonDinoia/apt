@@ -117,8 +117,10 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v5
+      # apt-utils (apt-ftparchive, dpkg-scanpackages) for build.py's repo
+      # writeout: the runner image no longer ships it.
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
       # The suite generates a throwaway signing key itself when GPG_KEY_ID is
       # unset — this branch workflow deliberately does not need
       # secrets.GPG_PRIVATE_KEY. Its containers fetch every payload from the
