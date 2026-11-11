@@ -43,7 +43,19 @@ jobs:
       # apt-ftparchive); gpg for the throwaway signing key the suite
       # generates in-runner (nothing here touches the production key).
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils gpg
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=5 && \
+               sudo apt-get install -y -o Acquire::Retries=5 dpkg-dev apt-utils gpg; then
+              exit 0
+            fi
+            if [ "$attempt" != 3 ]; then
+              echo "apt-get attempt $attempt/3 failed; retrying in 5s" >&2
+              sleep 5
+            fi
+          done
+          echo "failed to install packaging tools after 3 attempts" >&2
+          exit 1
 
       # GH_TOKEN rides to the mirror-release payload fetches in case the
       # release ever flips visibility or rate-limits anonymous pulls.

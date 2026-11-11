@@ -24,7 +24,19 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=5 && \
+               sudo apt-get install -y -o Acquire::Retries=5 dpkg-dev apt-utils; then
+              exit 0
+            fi
+            if [ "$attempt" != 3 ]; then
+              echo "apt-get attempt $attempt/3 failed; retrying in 5s" >&2
+              sleep 5
+            fi
+          done
+          echo "failed to install packaging tools after 3 attempts" >&2
+          exit 1
 
       # Holds the few payloads whose publisher offers no checksum, which have to
       # be downloaded once per upstream version to be hashed. Everything else is

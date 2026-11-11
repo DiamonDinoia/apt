@@ -42,7 +42,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=5 && \
+               sudo apt-get install -y -o Acquire::Retries=5 dpkg-dev; then
+              exit 0
+            fi
+            if [ "$attempt" != 3 ]; then
+              echo "apt-get attempt $attempt/3 failed; retrying in 5s" >&2
+              sleep 5
+            fi
+          done
+          echo "failed to install packaging tools after 3 attempts" >&2
+          exit 1
       # The matrix is derived from the shard space itself: sorted catalog
       # entry keys, round-robin; a slot is dispatched iff it resolves at
       # least one emit bundle (test_compilers.sh exits 1 on an empty slot,
@@ -120,7 +132,19 @@ jobs:
       # apt-utils (apt-ftparchive, dpkg-scanpackages) for build.py's repo
       # writeout: the runner image no longer ships it.
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=5 && \
+               sudo apt-get install -y -o Acquire::Retries=5 dpkg-dev apt-utils; then
+              exit 0
+            fi
+            if [ "$attempt" != 3 ]; then
+              echo "apt-get attempt $attempt/3 failed; retrying in 5s" >&2
+              sleep 5
+            fi
+          done
+          echo "failed to install packaging tools after 3 attempts" >&2
+          exit 1
       # The suite generates a throwaway signing key itself when GPG_KEY_ID is
       # unset — this branch workflow deliberately does not need
       # secrets.GPG_PRIVATE_KEY. Its containers fetch every payload from the
@@ -150,7 +174,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=5 && \
+               sudo apt-get install -y -o Acquire::Retries=5 dpkg-dev; then
+              exit 0
+            fi
+            if [ "$attempt" != 3 ]; then
+              echo "apt-get attempt $attempt/3 failed; retrying in 5s" >&2
+              sleep 5
+            fi
+          done
+          echo "failed to install packaging tools after 3 attempts" >&2
+          exit 1
       - name: An empty shard fails
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
