@@ -1609,128 +1609,6 @@
       "sha256": "64bdba7b5e00368735a670861cfe3d372a24801eeba785054f74d87aa3df5748",
       "size": 55149828
     },
-    "arm-gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "arm-unknown-linux-gnueabihf-addr2line",
-          "arm-unknown-linux-gnueabihf-c++",
-          "arm-unknown-linux-gnueabihf-c++filt",
-          "arm-unknown-linux-gnueabihf-cpp",
-          "arm-unknown-linux-gnueabihf-elfedit",
-          "arm-unknown-linux-gnueabihf-gcc-17.0.0",
-          "arm-unknown-linux-gnueabihf-gcc-ar",
-          "arm-unknown-linux-gnueabihf-gcc-nm",
-          "arm-unknown-linux-gnueabihf-gcc-ranlib",
-          "arm-unknown-linux-gnueabihf-gcov",
-          "arm-unknown-linux-gnueabihf-gcov-dump",
-          "arm-unknown-linux-gnueabihf-gcov-tool",
-          "arm-unknown-linux-gnueabihf-gfortran",
-          "arm-unknown-linux-gnueabihf-gprof",
-          "arm-unknown-linux-gnueabihf-ldd",
-          "arm-unknown-linux-gnueabihf-lto-dump",
-          "arm-unknown-linux-gnueabihf-populate",
-          "arm-unknown-linux-gnueabihf-size",
-          "arm-unknown-linux-gnueabihf-strings"
-        ],
-        "bin_links": {
-          "arm-unknown-linux-gnueabihf-ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-cc": {
-            "target": "arm-unknown-linux-gnueabihf-gcc",
-            "type": "symlink"
-          },
-          "arm-unknown-linux-gnueabihf-g++": {
-            "target": "arm-unknown-linux-gnueabihf-c++",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-gcc": {
-            "target": "arm-unknown-linux-gnueabihf-gcc-17.0.0",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "arm-unknown-linux-gnueabihf-strip": {
-            "target": "strip",
-            "type": "hardlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": null,
-        "gcc_targets": [
-          "arm-unknown-linux-gnueabihf"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "arm",
-        "host_emachine": 40,
-        "libgo_soname": null,
-        "multilib": [],
-        "needed": [
-          "libc.so.6"
-        ],
-        "root": {
-          "dot_prefix": false,
-          "nested": "arm-unknown-linux-gnueabihf",
-          "strip": 2,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "arm",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 40
-      },
-      "asset": "gcc-17-trunk20261114-arm-linux-gnueabihf.tar.xz",
-      "date": "20261114",
-      "etag": "\"5038f344626a9dbde7ff25c5a7f4b760-14\"",
-      "family": "arm-gcc-trunk",
-      "key": "opt/arm-gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "c01edd0e03a7f36d1783cebbba2f4439b5304f0ea135dc952bef1dce49a9a933",
-      "size": 115130544
-    },
     "arm-gcc-trunk-20261115.tar.xz": {
       "analysis": {
         "bin": [
@@ -3019,6 +2897,128 @@
       "major": 17,
       "sha256": "39e4367f7ec3ebfe95dc04b1a8bae63bfbaf08f3d4218085f2155950ad9fee12",
       "size": 115528308
+    },
+    "arm-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "arm-unknown-linux-gnueabihf-addr2line",
+          "arm-unknown-linux-gnueabihf-c++",
+          "arm-unknown-linux-gnueabihf-c++filt",
+          "arm-unknown-linux-gnueabihf-cpp",
+          "arm-unknown-linux-gnueabihf-elfedit",
+          "arm-unknown-linux-gnueabihf-gcc",
+          "arm-unknown-linux-gnueabihf-gcc-ar",
+          "arm-unknown-linux-gnueabihf-gcc-nm",
+          "arm-unknown-linux-gnueabihf-gcc-ranlib",
+          "arm-unknown-linux-gnueabihf-gcov",
+          "arm-unknown-linux-gnueabihf-gcov-dump",
+          "arm-unknown-linux-gnueabihf-gcov-tool",
+          "arm-unknown-linux-gnueabihf-gfortran",
+          "arm-unknown-linux-gnueabihf-gprof",
+          "arm-unknown-linux-gnueabihf-ldd",
+          "arm-unknown-linux-gnueabihf-lto-dump",
+          "arm-unknown-linux-gnueabihf-populate",
+          "arm-unknown-linux-gnueabihf-size",
+          "arm-unknown-linux-gnueabihf-strings"
+        ],
+        "bin_links": {
+          "arm-unknown-linux-gnueabihf-ar": {
+            "target": "ar",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-as": {
+            "target": "as",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-cc": {
+            "target": "arm-unknown-linux-gnueabihf-gcc",
+            "type": "symlink"
+          },
+          "arm-unknown-linux-gnueabihf-g++": {
+            "target": "arm-unknown-linux-gnueabihf-c++",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-gcc-17.0.0": {
+            "target": "arm-unknown-linux-gnueabihf-gcc",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-ld": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-ld.bfd": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-nm": {
+            "target": "nm",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-objcopy": {
+            "target": "objcopy",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-objdump": {
+            "target": "objdump",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-ranlib": {
+            "target": "ranlib",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-readelf": {
+            "target": "readelf",
+            "type": "hardlink"
+          },
+          "arm-unknown-linux-gnueabihf-strip": {
+            "target": "strip",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "arm-unknown-linux-gnueabihf"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": null,
+        "multilib": [],
+        "needed": [
+          "libc.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "arm-unknown-linux-gnueabihf",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "arm",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 40
+      },
+      "asset": "gcc-17-trunk20261128-arm-linux-gnueabihf.tar.xz",
+      "date": "20261128",
+      "etag": "\"6e20055f500edd790c48108baaa8e94e-14\"",
+      "family": "arm-gcc-trunk",
+      "key": "opt/arm-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "a5d9bab91b4cb88002776552d9c3004788545b51ac7815ea2dcf569ee0ff7de0",
+      "size": 115471960
     },
     "arm-unknown-gcc-13.4.0.tar.xz": {
       "analysis": {
@@ -6201,6 +6201,101 @@
       "sha256": "59b1416fe4d1151a17e95573bbc94361665fef0c4a69fa4074beb724826d5d3f",
       "size": 125241136
     },
+    "arm64-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "aarch64-unknown-linux-gnu-addr2line",
+          "aarch64-unknown-linux-gnu-ar",
+          "aarch64-unknown-linux-gnu-as",
+          "aarch64-unknown-linux-gnu-c++",
+          "aarch64-unknown-linux-gnu-c++filt",
+          "aarch64-unknown-linux-gnu-cpp",
+          "aarch64-unknown-linux-gnu-elfedit",
+          "aarch64-unknown-linux-gnu-gcc-17.0.0",
+          "aarch64-unknown-linux-gnu-gcc-ar",
+          "aarch64-unknown-linux-gnu-gcc-nm",
+          "aarch64-unknown-linux-gnu-gcc-ranlib",
+          "aarch64-unknown-linux-gnu-gcov",
+          "aarch64-unknown-linux-gnu-gcov-dump",
+          "aarch64-unknown-linux-gnu-gcov-tool",
+          "aarch64-unknown-linux-gnu-gfortran",
+          "aarch64-unknown-linux-gnu-gprof",
+          "aarch64-unknown-linux-gnu-ld",
+          "aarch64-unknown-linux-gnu-ldd",
+          "aarch64-unknown-linux-gnu-lto-dump",
+          "aarch64-unknown-linux-gnu-nm",
+          "aarch64-unknown-linux-gnu-objcopy",
+          "aarch64-unknown-linux-gnu-objdump",
+          "aarch64-unknown-linux-gnu-populate",
+          "aarch64-unknown-linux-gnu-ranlib",
+          "aarch64-unknown-linux-gnu-readelf",
+          "aarch64-unknown-linux-gnu-size",
+          "aarch64-unknown-linux-gnu-strings",
+          "aarch64-unknown-linux-gnu-strip"
+        ],
+        "bin_links": {
+          "aarch64-unknown-linux-gnu-cc": {
+            "target": "aarch64-unknown-linux-gnu-gcc",
+            "type": "symlink"
+          },
+          "aarch64-unknown-linux-gnu-g++": {
+            "target": "aarch64-unknown-linux-gnu-c++",
+            "type": "hardlink"
+          },
+          "aarch64-unknown-linux-gnu-gcc": {
+            "target": "aarch64-unknown-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "aarch64-unknown-linux-gnu-ld.bfd": {
+            "target": "aarch64-unknown-linux-gnu-ld",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "aarch64-unknown-linux-gnu"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": null,
+        "multilib": [],
+        "needed": [
+          "libc.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "aarch64-unknown-linux-gnu",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "aarch64",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 183
+      },
+      "asset": "gcc-17-trunk20261128-aarch64-linux-gnu.tar.xz",
+      "date": "20261128",
+      "etag": "\"bb2a0fd23822ae7f9bd36bd5ed522cb9-15\"",
+      "family": "arm64-gcc-trunk",
+      "key": "opt/arm64-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "c7efb4373a33a86e2dfe9aaa33128d6cc64e1a5b0e4ff0764357a58b83104f71",
+      "size": 125190060
+    },
     "avr-gcc-10.3.0.tar.xz": {
       "analysis": {
         "bin": [
@@ -8240,242 +8335,6 @@
       "kind": "stable",
       "sha256": "73c3e236bc4bb6b0efeca6253c3786c28352d35d9ed837bc47c41694f28369f9",
       "size": 46209664
-    },
-    "bpf-gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "bpf-unknown-none-addr2line",
-          "bpf-unknown-none-bpf-unknown-none-gccrs",
-          "bpf-unknown-none-c++",
-          "bpf-unknown-none-c++filt",
-          "bpf-unknown-none-cpp",
-          "bpf-unknown-none-elfedit",
-          "bpf-unknown-none-gcc-17.0.0",
-          "bpf-unknown-none-gcc-ar",
-          "bpf-unknown-none-gcc-nm",
-          "bpf-unknown-none-gcc-ranlib",
-          "bpf-unknown-none-gprof",
-          "bpf-unknown-none-lto-dump",
-          "bpf-unknown-none-size",
-          "bpf-unknown-none-strings"
-        ],
-        "bin_links": {
-          "bpf-unknown-addr2line": {
-            "target": "bpf-unknown-none-addr2line",
-            "type": "symlink"
-          },
-          "bpf-unknown-ar": {
-            "target": "bpf-unknown-none-ar",
-            "type": "symlink"
-          },
-          "bpf-unknown-as": {
-            "target": "bpf-unknown-none-as",
-            "type": "symlink"
-          },
-          "bpf-unknown-bpf-unknown-none-gccrs": {
-            "target": "bpf-unknown-none-bpf-unknown-none-gccrs",
-            "type": "symlink"
-          },
-          "bpf-unknown-c++": {
-            "target": "bpf-unknown-none-c++",
-            "type": "symlink"
-          },
-          "bpf-unknown-c++filt": {
-            "target": "bpf-unknown-none-c++filt",
-            "type": "symlink"
-          },
-          "bpf-unknown-cc": {
-            "target": "bpf-unknown-none-cc",
-            "type": "symlink"
-          },
-          "bpf-unknown-cpp": {
-            "target": "bpf-unknown-none-cpp",
-            "type": "symlink"
-          },
-          "bpf-unknown-elfedit": {
-            "target": "bpf-unknown-none-elfedit",
-            "type": "symlink"
-          },
-          "bpf-unknown-g++": {
-            "target": "bpf-unknown-none-g++",
-            "type": "symlink"
-          },
-          "bpf-unknown-gcc": {
-            "target": "bpf-unknown-none-gcc",
-            "type": "symlink"
-          },
-          "bpf-unknown-gcc-17.0.0": {
-            "target": "bpf-unknown-none-gcc-17.0.0",
-            "type": "symlink"
-          },
-          "bpf-unknown-gcc-ar": {
-            "target": "bpf-unknown-none-gcc-ar",
-            "type": "symlink"
-          },
-          "bpf-unknown-gcc-nm": {
-            "target": "bpf-unknown-none-gcc-nm",
-            "type": "symlink"
-          },
-          "bpf-unknown-gcc-ranlib": {
-            "target": "bpf-unknown-none-gcc-ranlib",
-            "type": "symlink"
-          },
-          "bpf-unknown-gccrs": {
-            "target": "bpf-unknown-none-gccrs",
-            "type": "symlink"
-          },
-          "bpf-unknown-gprof": {
-            "target": "bpf-unknown-none-gprof",
-            "type": "symlink"
-          },
-          "bpf-unknown-ld": {
-            "target": "bpf-unknown-none-ld",
-            "type": "symlink"
-          },
-          "bpf-unknown-ld.bfd": {
-            "target": "bpf-unknown-none-ld.bfd",
-            "type": "symlink"
-          },
-          "bpf-unknown-lto-dump": {
-            "target": "bpf-unknown-none-lto-dump",
-            "type": "symlink"
-          },
-          "bpf-unknown-nm": {
-            "target": "bpf-unknown-none-nm",
-            "type": "symlink"
-          },
-          "bpf-unknown-none-ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-cc": {
-            "target": "bpf-unknown-none-gcc",
-            "type": "symlink"
-          },
-          "bpf-unknown-none-g++": {
-            "target": "bpf-unknown-none-c++",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-gcc": {
-            "target": "bpf-unknown-none-gcc-17.0.0",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-gccrs": {
-            "target": "bpf-unknown-none-bpf-unknown-none-gccrs",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "bpf-unknown-none-strip": {
-            "target": "strip",
-            "type": "hardlink"
-          },
-          "bpf-unknown-objcopy": {
-            "target": "bpf-unknown-none-objcopy",
-            "type": "symlink"
-          },
-          "bpf-unknown-objdump": {
-            "target": "bpf-unknown-none-objdump",
-            "type": "symlink"
-          },
-          "bpf-unknown-ranlib": {
-            "target": "bpf-unknown-none-ranlib",
-            "type": "symlink"
-          },
-          "bpf-unknown-readelf": {
-            "target": "bpf-unknown-none-readelf",
-            "type": "symlink"
-          },
-          "bpf-unknown-size": {
-            "target": "bpf-unknown-none-size",
-            "type": "symlink"
-          },
-          "bpf-unknown-strings": {
-            "target": "bpf-unknown-none-strings",
-            "type": "symlink"
-          },
-          "bpf-unknown-strip": {
-            "target": "bpf-unknown-none-strip",
-            "type": "symlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": null,
-        "gcc_targets": [
-          "bpf-unknown-none"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "x86-64",
-        "host_emachine": 62,
-        "libgo_soname": null,
-        "multilib": [],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libc.so.6",
-          "libfl.so.2",
-          "libm.so.6"
-        ],
-        "root": {
-          "dot_prefix": false,
-          "nested": "bpf-unknown-none",
-          "strip": 2,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "bpf",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 247
-      },
-      "asset": "gcc-17-trunk20261114-bpf.tar.xz",
-      "date": "20261114",
-      "etag": "\"67c28b580b72d978ebfd0a009732e645-10\"",
-      "family": "bpf-gcc-trunk",
-      "key": "opt/bpf-gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "903c37b00aa92abb0d27666a143af273be9449ee8ce8f34c0412fc541fbe07d7",
-      "size": 78921456
     },
     "bpf-gcc-trunk-20261115.tar.xz": {
       "analysis": {
@@ -11247,6 +11106,242 @@
       "major": 17,
       "sha256": "f1bacfa5419184721efffece76b49c9fd31ad17619f7cd8697b40247a098edc7",
       "size": 77814128
+    },
+    "bpf-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "bpf-unknown-none-addr2line",
+          "bpf-unknown-none-c++",
+          "bpf-unknown-none-c++filt",
+          "bpf-unknown-none-cpp",
+          "bpf-unknown-none-elfedit",
+          "bpf-unknown-none-gcc-17.0.0",
+          "bpf-unknown-none-gcc-ar",
+          "bpf-unknown-none-gcc-nm",
+          "bpf-unknown-none-gcc-ranlib",
+          "bpf-unknown-none-gccrs",
+          "bpf-unknown-none-gprof",
+          "bpf-unknown-none-lto-dump",
+          "bpf-unknown-none-size",
+          "bpf-unknown-none-strings"
+        ],
+        "bin_links": {
+          "bpf-unknown-addr2line": {
+            "target": "bpf-unknown-none-addr2line",
+            "type": "symlink"
+          },
+          "bpf-unknown-ar": {
+            "target": "bpf-unknown-none-ar",
+            "type": "symlink"
+          },
+          "bpf-unknown-as": {
+            "target": "bpf-unknown-none-as",
+            "type": "symlink"
+          },
+          "bpf-unknown-bpf-unknown-none-gccrs": {
+            "target": "bpf-unknown-none-bpf-unknown-none-gccrs",
+            "type": "symlink"
+          },
+          "bpf-unknown-c++": {
+            "target": "bpf-unknown-none-c++",
+            "type": "symlink"
+          },
+          "bpf-unknown-c++filt": {
+            "target": "bpf-unknown-none-c++filt",
+            "type": "symlink"
+          },
+          "bpf-unknown-cc": {
+            "target": "bpf-unknown-none-cc",
+            "type": "symlink"
+          },
+          "bpf-unknown-cpp": {
+            "target": "bpf-unknown-none-cpp",
+            "type": "symlink"
+          },
+          "bpf-unknown-elfedit": {
+            "target": "bpf-unknown-none-elfedit",
+            "type": "symlink"
+          },
+          "bpf-unknown-g++": {
+            "target": "bpf-unknown-none-g++",
+            "type": "symlink"
+          },
+          "bpf-unknown-gcc": {
+            "target": "bpf-unknown-none-gcc",
+            "type": "symlink"
+          },
+          "bpf-unknown-gcc-17.0.0": {
+            "target": "bpf-unknown-none-gcc-17.0.0",
+            "type": "symlink"
+          },
+          "bpf-unknown-gcc-ar": {
+            "target": "bpf-unknown-none-gcc-ar",
+            "type": "symlink"
+          },
+          "bpf-unknown-gcc-nm": {
+            "target": "bpf-unknown-none-gcc-nm",
+            "type": "symlink"
+          },
+          "bpf-unknown-gcc-ranlib": {
+            "target": "bpf-unknown-none-gcc-ranlib",
+            "type": "symlink"
+          },
+          "bpf-unknown-gccrs": {
+            "target": "bpf-unknown-none-gccrs",
+            "type": "symlink"
+          },
+          "bpf-unknown-gprof": {
+            "target": "bpf-unknown-none-gprof",
+            "type": "symlink"
+          },
+          "bpf-unknown-ld": {
+            "target": "bpf-unknown-none-ld",
+            "type": "symlink"
+          },
+          "bpf-unknown-ld.bfd": {
+            "target": "bpf-unknown-none-ld.bfd",
+            "type": "symlink"
+          },
+          "bpf-unknown-lto-dump": {
+            "target": "bpf-unknown-none-lto-dump",
+            "type": "symlink"
+          },
+          "bpf-unknown-nm": {
+            "target": "bpf-unknown-none-nm",
+            "type": "symlink"
+          },
+          "bpf-unknown-none-ar": {
+            "target": "ar",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-as": {
+            "target": "as",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-bpf-unknown-none-gccrs": {
+            "target": "bpf-unknown-none-gccrs",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-cc": {
+            "target": "bpf-unknown-none-gcc",
+            "type": "symlink"
+          },
+          "bpf-unknown-none-g++": {
+            "target": "bpf-unknown-none-c++",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-gcc": {
+            "target": "bpf-unknown-none-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-ld": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-ld.bfd": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-nm": {
+            "target": "nm",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-objcopy": {
+            "target": "objcopy",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-objdump": {
+            "target": "objdump",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-ranlib": {
+            "target": "ranlib",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-readelf": {
+            "target": "readelf",
+            "type": "hardlink"
+          },
+          "bpf-unknown-none-strip": {
+            "target": "strip",
+            "type": "hardlink"
+          },
+          "bpf-unknown-objcopy": {
+            "target": "bpf-unknown-none-objcopy",
+            "type": "symlink"
+          },
+          "bpf-unknown-objdump": {
+            "target": "bpf-unknown-none-objdump",
+            "type": "symlink"
+          },
+          "bpf-unknown-ranlib": {
+            "target": "bpf-unknown-none-ranlib",
+            "type": "symlink"
+          },
+          "bpf-unknown-readelf": {
+            "target": "bpf-unknown-none-readelf",
+            "type": "symlink"
+          },
+          "bpf-unknown-size": {
+            "target": "bpf-unknown-none-size",
+            "type": "symlink"
+          },
+          "bpf-unknown-strings": {
+            "target": "bpf-unknown-none-strings",
+            "type": "symlink"
+          },
+          "bpf-unknown-strip": {
+            "target": "bpf-unknown-none-strip",
+            "type": "symlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "bpf-unknown-none"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": null,
+        "multilib": [],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libfl.so.2",
+          "libm.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "bpf-unknown-none",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "bpf",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 247
+      },
+      "asset": "gcc-17-trunk20261128-bpf.tar.xz",
+      "date": "20261128",
+      "etag": "\"75447c7657af04cd6a5a91fd1f07a8ba-10\"",
+      "family": "bpf-gcc-trunk",
+      "key": "opt/bpf-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "8ae569fa6b5ae1a1b84dfb60b6fbb97330468ff9b11bb44cc42f1a542860f51b",
+      "size": 77759536
     },
     "c6x-gcc-12.5.0.tar.xz": {
       "analysis": {
@@ -16089,271 +16184,6 @@
       "sha256": "0cdcada6643e347b3c33658a4baef089442d0ff5c6da908bf4faa11c1251b606",
       "size": 538181924
     },
-    "clang-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "analyze-build",
-          "c-index-test",
-          "cir-lsp-server",
-          "cir-opt",
-          "cir-translate",
-          "clang-24",
-          "clang-apply-replacements",
-          "clang-change-namespace",
-          "clang-check",
-          "clang-doc",
-          "clang-extdef-mapping",
-          "clang-format",
-          "clang-include-cleaner",
-          "clang-include-fixer",
-          "clang-installapi",
-          "clang-linker-wrapper",
-          "clang-move",
-          "clang-nvlink-wrapper",
-          "clang-offload-bundler",
-          "clang-query",
-          "clang-refactor",
-          "clang-reorder-fields",
-          "clang-repl",
-          "clang-scan-deps",
-          "clang-ssaf-analyzer",
-          "clang-ssaf-format",
-          "clang-ssaf-linker",
-          "clang-ssaf-src-edit-merge",
-          "clang-sycl-linker",
-          "clang-tblgen",
-          "clang-tidy",
-          "clangd",
-          "diagtool",
-          "dsymutil",
-          "find-all-symbols",
-          "git-clang-format",
-          "hmaptool",
-          "intercept-build",
-          "llc",
-          "lld",
-          "lli",
-          "llubi",
-          "llvm-ar",
-          "llvm-as",
-          "llvm-bcanalyzer",
-          "llvm-c-test",
-          "llvm-calc-occupancy",
-          "llvm-cas",
-          "llvm-cat",
-          "llvm-cfi-verify",
-          "llvm-cgdata",
-          "llvm-config",
-          "llvm-cov",
-          "llvm-ctxprof-util",
-          "llvm-cvtres",
-          "llvm-cxxdump",
-          "llvm-cxxfilt",
-          "llvm-cxxmap",
-          "llvm-debuginfo-analyzer",
-          "llvm-debuginfod",
-          "llvm-debuginfod-find",
-          "llvm-diff",
-          "llvm-dis",
-          "llvm-dwarfdump",
-          "llvm-dwarfutil",
-          "llvm-dwp",
-          "llvm-exegesis",
-          "llvm-extract",
-          "llvm-gpu-loader",
-          "llvm-gsymutil",
-          "llvm-ifs",
-          "llvm-ir2vec",
-          "llvm-jitlink",
-          "llvm-libtool-darwin",
-          "llvm-link",
-          "llvm-lipo",
-          "llvm-lto",
-          "llvm-lto2",
-          "llvm-mc",
-          "llvm-mca",
-          "llvm-ml",
-          "llvm-modextract",
-          "llvm-nm",
-          "llvm-objcopy",
-          "llvm-objdump",
-          "llvm-offload-binary",
-          "llvm-offload-device-info",
-          "llvm-offload-wrapper",
-          "llvm-omp-kernel-replay",
-          "llvm-opt-report",
-          "llvm-pdbutil",
-          "llvm-profdata",
-          "llvm-profgen",
-          "llvm-rc",
-          "llvm-readobj",
-          "llvm-readtapi",
-          "llvm-reduce",
-          "llvm-remarkutil",
-          "llvm-rtdyld",
-          "llvm-size",
-          "llvm-split",
-          "llvm-stress",
-          "llvm-strings",
-          "llvm-symbolizer",
-          "llvm-tblgen",
-          "llvm-tli-checker",
-          "llvm-undname",
-          "llvm-xray",
-          "modularize",
-          "offload-arch",
-          "opt",
-          "pp-trace",
-          "reduce-chunk-list",
-          "run-clang-tidy",
-          "sancov",
-          "sanstats",
-          "scan-build",
-          "scan-build-py",
-          "scan-view",
-          "sycl-ls",
-          "verify-uselistorder"
-        ],
-        "bin_links": {
-          "amdgpu-arch": {
-            "target": "offload-arch",
-            "type": "symlink"
-          },
-          "clang": {
-            "target": "clang-24",
-            "type": "symlink"
-          },
-          "clang++": {
-            "target": "clang",
-            "type": "symlink"
-          },
-          "clang-cl": {
-            "target": "clang",
-            "type": "symlink"
-          },
-          "clang-cpp": {
-            "target": "clang",
-            "type": "symlink"
-          },
-          "clang-dxc": {
-            "target": "clang",
-            "type": "symlink"
-          },
-          "clang-offload-packager": {
-            "target": "llvm-offload-binary",
-            "type": "symlink"
-          },
-          "ld.lld": {
-            "target": "lld",
-            "type": "symlink"
-          },
-          "ld64.lld": {
-            "target": "lld",
-            "type": "symlink"
-          },
-          "lld-link": {
-            "target": "lld",
-            "type": "symlink"
-          },
-          "llvm-addr2line": {
-            "target": "llvm-symbolizer",
-            "type": "symlink"
-          },
-          "llvm-bitcode-strip": {
-            "target": "llvm-objcopy",
-            "type": "symlink"
-          },
-          "llvm-dlltool": {
-            "target": "llvm-ar",
-            "type": "symlink"
-          },
-          "llvm-extract-bundle-entry": {
-            "target": "llvm-objcopy",
-            "type": "symlink"
-          },
-          "llvm-install-name-tool": {
-            "target": "llvm-objcopy",
-            "type": "symlink"
-          },
-          "llvm-lib": {
-            "target": "llvm-ar",
-            "type": "symlink"
-          },
-          "llvm-ml64": {
-            "target": "llvm-ml",
-            "type": "symlink"
-          },
-          "llvm-otool": {
-            "target": "llvm-objdump",
-            "type": "symlink"
-          },
-          "llvm-ranlib": {
-            "target": "llvm-ar",
-            "type": "symlink"
-          },
-          "llvm-readelf": {
-            "target": "llvm-readobj",
-            "type": "symlink"
-          },
-          "llvm-strip": {
-            "target": "llvm-objcopy",
-            "type": "symlink"
-          },
-          "llvm-windres": {
-            "target": "llvm-rc",
-            "type": "symlink"
-          },
-          "nvptx-arch": {
-            "target": "offload-arch",
-            "type": "symlink"
-          },
-          "wasm-ld": {
-            "target": "lld",
-            "type": "symlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": "24",
-        "gcc_targets": [],
-        "gcc_version": null,
-        "has_binutils": false,
-        "host_arch": "x86-64",
-        "host_emachine": 62,
-        "libgo_soname": null,
-        "multilib": [],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libLLVMOffload.so.24.0git",
-          "libLLVMSYCL.so.0.1.0",
-          "libc.so.6",
-          "libclang.so.24.0git",
-          "libgcc_s.so.1",
-          "libm.so.6",
-          "libomp.so",
-          "libomptarget.so.24.0git",
-          "libstdc++.so.6",
-          "libz.so.1"
-        ],
-        "root": {
-          "dot_prefix": true,
-          "nested": null,
-          "strip": 1,
-          "top": "clang-trunk-20261114"
-        },
-        "target_arch": null,
-        "target_bin": [],
-        "target_emachine": null
-      },
-      "asset": "clang-24-trunk20261114.tar.xz",
-      "date": "20261114",
-      "etag": "\"69c55bee1cc1970dd0f4247f4f1b84b0-182\"",
-      "family": "clang-trunk",
-      "key": "opt/clang-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 24,
-      "sha256": "e24e0c5a2df869a9e18064135095fc3dc2c0692502ba1041b123852a85b9f2a6",
-      "size": 1523570208
-    },
     "clang-trunk-20261115.tar.xz": {
       "analysis": {
         "bin": [
@@ -19008,6 +18838,272 @@
       "major": 24,
       "sha256": "202dfa55d7b2cd91cbb62033129dff14eebb05e282291694496d7e97eaa1a21c",
       "size": 1534473004
+    },
+    "clang-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "analyze-build",
+          "c-index-test",
+          "cir-lsp-server",
+          "cir-offload-merge",
+          "cir-opt",
+          "cir-translate",
+          "clang-24",
+          "clang-apply-replacements",
+          "clang-change-namespace",
+          "clang-check",
+          "clang-doc",
+          "clang-extdef-mapping",
+          "clang-format",
+          "clang-include-cleaner",
+          "clang-include-fixer",
+          "clang-installapi",
+          "clang-linker-wrapper",
+          "clang-move",
+          "clang-nvlink-wrapper",
+          "clang-offload-bundler",
+          "clang-query",
+          "clang-refactor",
+          "clang-reorder-fields",
+          "clang-repl",
+          "clang-scan-deps",
+          "clang-ssaf-analyzer",
+          "clang-ssaf-format",
+          "clang-ssaf-linker",
+          "clang-ssaf-src-edit-merge",
+          "clang-sycl-linker",
+          "clang-tblgen",
+          "clang-tidy",
+          "clangd",
+          "diagtool",
+          "dsymutil",
+          "find-all-symbols",
+          "git-clang-format",
+          "hmaptool",
+          "intercept-build",
+          "llc",
+          "lld",
+          "lli",
+          "llubi",
+          "llvm-ar",
+          "llvm-as",
+          "llvm-bcanalyzer",
+          "llvm-c-test",
+          "llvm-calc-occupancy",
+          "llvm-cas",
+          "llvm-cat",
+          "llvm-cfi-verify",
+          "llvm-cgdata",
+          "llvm-config",
+          "llvm-cov",
+          "llvm-ctxprof-util",
+          "llvm-cvtres",
+          "llvm-cxxdump",
+          "llvm-cxxfilt",
+          "llvm-cxxmap",
+          "llvm-debuginfo-analyzer",
+          "llvm-debuginfod",
+          "llvm-debuginfod-find",
+          "llvm-diff",
+          "llvm-dis",
+          "llvm-dwarfdump",
+          "llvm-dwarfutil",
+          "llvm-dwp",
+          "llvm-exegesis",
+          "llvm-extract",
+          "llvm-gpu-loader",
+          "llvm-gsymutil",
+          "llvm-ifs",
+          "llvm-ir2vec",
+          "llvm-jitlink",
+          "llvm-libtool-darwin",
+          "llvm-link",
+          "llvm-lipo",
+          "llvm-lto",
+          "llvm-lto2",
+          "llvm-mc",
+          "llvm-mca",
+          "llvm-ml",
+          "llvm-modextract",
+          "llvm-nm",
+          "llvm-objcopy",
+          "llvm-objdump",
+          "llvm-offload-binary",
+          "llvm-offload-device-info",
+          "llvm-offload-wrapper",
+          "llvm-omp-kernel-replay",
+          "llvm-opt-report",
+          "llvm-pdbutil",
+          "llvm-profdata",
+          "llvm-profgen",
+          "llvm-rc",
+          "llvm-readobj",
+          "llvm-readtapi",
+          "llvm-reduce",
+          "llvm-remarkutil",
+          "llvm-rtdyld",
+          "llvm-size",
+          "llvm-split",
+          "llvm-stress",
+          "llvm-strings",
+          "llvm-symbolizer",
+          "llvm-tblgen",
+          "llvm-tli-checker",
+          "llvm-undname",
+          "llvm-xray",
+          "modularize",
+          "offload-arch",
+          "opt",
+          "pp-trace",
+          "reduce-chunk-list",
+          "run-clang-tidy",
+          "sancov",
+          "sanstats",
+          "scan-build",
+          "scan-build-py",
+          "scan-view",
+          "sycl-ls",
+          "verify-uselistorder"
+        ],
+        "bin_links": {
+          "amdgpu-arch": {
+            "target": "offload-arch",
+            "type": "symlink"
+          },
+          "clang": {
+            "target": "clang-24",
+            "type": "symlink"
+          },
+          "clang++": {
+            "target": "clang",
+            "type": "symlink"
+          },
+          "clang-cl": {
+            "target": "clang",
+            "type": "symlink"
+          },
+          "clang-cpp": {
+            "target": "clang",
+            "type": "symlink"
+          },
+          "clang-dxc": {
+            "target": "clang",
+            "type": "symlink"
+          },
+          "clang-offload-packager": {
+            "target": "llvm-offload-binary",
+            "type": "symlink"
+          },
+          "ld.lld": {
+            "target": "lld",
+            "type": "symlink"
+          },
+          "ld64.lld": {
+            "target": "lld",
+            "type": "symlink"
+          },
+          "lld-link": {
+            "target": "lld",
+            "type": "symlink"
+          },
+          "llvm-addr2line": {
+            "target": "llvm-symbolizer",
+            "type": "symlink"
+          },
+          "llvm-bitcode-strip": {
+            "target": "llvm-objcopy",
+            "type": "symlink"
+          },
+          "llvm-dlltool": {
+            "target": "llvm-ar",
+            "type": "symlink"
+          },
+          "llvm-extract-bundle-entry": {
+            "target": "llvm-objcopy",
+            "type": "symlink"
+          },
+          "llvm-install-name-tool": {
+            "target": "llvm-objcopy",
+            "type": "symlink"
+          },
+          "llvm-lib": {
+            "target": "llvm-ar",
+            "type": "symlink"
+          },
+          "llvm-ml64": {
+            "target": "llvm-ml",
+            "type": "symlink"
+          },
+          "llvm-otool": {
+            "target": "llvm-objdump",
+            "type": "symlink"
+          },
+          "llvm-ranlib": {
+            "target": "llvm-ar",
+            "type": "symlink"
+          },
+          "llvm-readelf": {
+            "target": "llvm-readobj",
+            "type": "symlink"
+          },
+          "llvm-strip": {
+            "target": "llvm-objcopy",
+            "type": "symlink"
+          },
+          "llvm-windres": {
+            "target": "llvm-rc",
+            "type": "symlink"
+          },
+          "nvptx-arch": {
+            "target": "offload-arch",
+            "type": "symlink"
+          },
+          "wasm-ld": {
+            "target": "lld",
+            "type": "symlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": "24",
+        "gcc_targets": [],
+        "gcc_version": null,
+        "has_binutils": false,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": null,
+        "multilib": [],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libLLVMOffload.so.24.0git",
+          "libLLVMSYCL.so.0.1.0",
+          "libc.so.6",
+          "libclang.so.24.0git",
+          "libgcc_s.so.1",
+          "libm.so.6",
+          "libomp.so",
+          "libomptarget.so.24.0git",
+          "libstdc++.so.6",
+          "libz.so.1"
+        ],
+        "root": {
+          "dot_prefix": true,
+          "nested": null,
+          "strip": 1,
+          "top": "clang-trunk-20261128"
+        },
+        "target_arch": null,
+        "target_bin": [],
+        "target_emachine": null
+      },
+      "asset": "clang-24-trunk20261128.tar.xz",
+      "date": "20261128",
+      "etag": "\"60a36de73834267c19eecd2b050d9679-183\"",
+      "family": "clang-trunk",
+      "key": "opt/clang-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 24,
+      "sha256": "710775c07ac7ea2ab4b68b902bb29c006897718357a33e77bad7ea374e203398",
+      "size": 1534805700
     },
     "gcc-10.5.0.tar.xz": {
       "analysis": {
@@ -21826,237 +21922,6 @@
       "kind": "stable",
       "sha256": "3fbe25bdecd0b5fb138336e6f776423352c09de321bf302993350b1741522e00",
       "size": 319099300
-    },
-    "gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "addr2line",
-          "c++filt",
-          "cpp",
-          "elfedit",
-          "g++",
-          "gccrs",
-          "gcobc",
-          "gcobol",
-          "gcov",
-          "gcov-dump",
-          "gcov-tool",
-          "gfortran",
-          "gm2",
-          "gnat",
-          "gnatbind",
-          "gnatchop",
-          "gnatclean",
-          "gnatkr",
-          "gnatlink",
-          "gnatls",
-          "gnatmake",
-          "gnatname",
-          "gnatprep",
-          "go",
-          "gofmt",
-          "gprof",
-          "gprofng",
-          "gprofng-archive",
-          "gprofng-collect-app",
-          "gprofng-display-html",
-          "gprofng-display-src",
-          "gprofng-display-text",
-          "gprofng-gmon",
-          "lto-dump",
-          "size",
-          "strings",
-          "x86_64-linux-gnu-ga68",
-          "x86_64-linux-gnu-gcc-17.0.0",
-          "x86_64-linux-gnu-gcc-ar",
-          "x86_64-linux-gnu-gcc-nm",
-          "x86_64-linux-gnu-gcc-ranlib",
-          "x86_64-linux-gnu-gccgo",
-          "x86_64-linux-gnu-gdc"
-        ],
-        "bin_links": {
-          "ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "c++": {
-            "target": "g++",
-            "type": "hardlink"
-          },
-          "ga68": {
-            "target": "x86_64-linux-gnu-ga68",
-            "type": "hardlink"
-          },
-          "gcc": {
-            "target": "x86_64-linux-gnu-gcc-17.0.0",
-            "type": "hardlink"
-          },
-          "gcc-ar": {
-            "target": "x86_64-linux-gnu-gcc-ar",
-            "type": "hardlink"
-          },
-          "gcc-nm": {
-            "target": "x86_64-linux-gnu-gcc-nm",
-            "type": "hardlink"
-          },
-          "gcc-ranlib": {
-            "target": "x86_64-linux-gnu-gcc-ranlib",
-            "type": "hardlink"
-          },
-          "gccgo": {
-            "target": "x86_64-linux-gnu-gccgo",
-            "type": "hardlink"
-          },
-          "gdc": {
-            "target": "x86_64-linux-gnu-gdc",
-            "type": "hardlink"
-          },
-          "gp-archive": {
-            "target": "gprofng-archive",
-            "type": "symlink"
-          },
-          "gp-collect-app": {
-            "target": "gprofng-collect-app",
-            "type": "symlink"
-          },
-          "gp-display-html": {
-            "target": "gprofng-display-html",
-            "type": "symlink"
-          },
-          "gp-display-src": {
-            "target": "gprofng-display-src",
-            "type": "symlink"
-          },
-          "gp-display-text": {
-            "target": "gprofng-display-text",
-            "type": "symlink"
-          },
-          "ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "strip": {
-            "target": "strip",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-c++": {
-            "target": "g++",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-g++": {
-            "target": "g++",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-gcc": {
-            "target": "x86_64-linux-gnu-gcc-17.0.0",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-gccrs": {
-            "target": "gccrs",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-gcobc": {
-            "target": "gcobc",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-gcobol": {
-            "target": "gcobol",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-gfortran": {
-            "target": "gfortran",
-            "type": "hardlink"
-          },
-          "x86_64-linux-gnu-gm2": {
-            "target": "gm2",
-            "type": "hardlink"
-          }
-        },
-        "binutils_in_bin": [
-          "ar",
-          "as",
-          "ld"
-        ],
-        "clang_version": null,
-        "gcc_targets": [
-          "x86_64-linux-gnu"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "x86-64",
-        "host_emachine": 62,
-        "libgo_soname": "libgo.so.25",
-        "multilib": [
-          "lib32",
-          "lib64",
-          "libx32"
-        ],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libc.so.6",
-          "libgcc_s.so.1",
-          "libgo.so.25",
-          "libm.so.6",
-          "libstdc++.so.6"
-        ],
-        "root": {
-          "dot_prefix": true,
-          "nested": null,
-          "strip": 1,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "i386",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 3
-      },
-      "asset": "gcc-17-trunk20261114.tar.xz",
-      "date": "20261114",
-      "etag": "\"625f92150000fcbac6d3521f687b4733-49\"",
-      "family": "gcc-trunk",
-      "key": "opt/gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "9fc0bb22da55cbb0f91e8dc13789aed4e6209893b51963223a39ab0c45f6156c",
-      "size": 404230204
     },
     "gcc-trunk-20261115.tar.xz": {
       "analysis": {
@@ -25060,6 +24925,237 @@
       "major": 17,
       "sha256": "cc750e7b1e00719cb38c0e8cbbea4ec606e45b3b9b41c4f4b3c55d7dc73680d0",
       "size": 405243936
+    },
+    "gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "addr2line",
+          "c++filt",
+          "cpp",
+          "elfedit",
+          "ga68",
+          "gcc-ar",
+          "gcc-nm",
+          "gccgo",
+          "gcobol",
+          "gcov",
+          "gcov-dump",
+          "gcov-tool",
+          "gfortran",
+          "gnat",
+          "gnatbind",
+          "gnatchop",
+          "gnatclean",
+          "gnatkr",
+          "gnatlink",
+          "gnatls",
+          "gnatmake",
+          "gnatname",
+          "gnatprep",
+          "go",
+          "gofmt",
+          "gprof",
+          "gprofng",
+          "gprofng-archive",
+          "gprofng-collect-app",
+          "gprofng-display-html",
+          "gprofng-display-src",
+          "gprofng-display-text",
+          "gprofng-gmon",
+          "lto-dump",
+          "size",
+          "strings",
+          "x86_64-linux-gnu-g++",
+          "x86_64-linux-gnu-gcc-17.0.0",
+          "x86_64-linux-gnu-gcc-ranlib",
+          "x86_64-linux-gnu-gccrs",
+          "x86_64-linux-gnu-gcobc",
+          "x86_64-linux-gnu-gdc",
+          "x86_64-linux-gnu-gm2"
+        ],
+        "bin_links": {
+          "ar": {
+            "target": "ar",
+            "type": "hardlink"
+          },
+          "as": {
+            "target": "as",
+            "type": "hardlink"
+          },
+          "c++": {
+            "target": "x86_64-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "g++": {
+            "target": "x86_64-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "gcc": {
+            "target": "x86_64-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "gcc-ranlib": {
+            "target": "x86_64-linux-gnu-gcc-ranlib",
+            "type": "hardlink"
+          },
+          "gccrs": {
+            "target": "x86_64-linux-gnu-gccrs",
+            "type": "hardlink"
+          },
+          "gcobc": {
+            "target": "x86_64-linux-gnu-gcobc",
+            "type": "hardlink"
+          },
+          "gdc": {
+            "target": "x86_64-linux-gnu-gdc",
+            "type": "hardlink"
+          },
+          "gm2": {
+            "target": "x86_64-linux-gnu-gm2",
+            "type": "hardlink"
+          },
+          "gp-archive": {
+            "target": "gprofng-archive",
+            "type": "symlink"
+          },
+          "gp-collect-app": {
+            "target": "gprofng-collect-app",
+            "type": "symlink"
+          },
+          "gp-display-html": {
+            "target": "gprofng-display-html",
+            "type": "symlink"
+          },
+          "gp-display-src": {
+            "target": "gprofng-display-src",
+            "type": "symlink"
+          },
+          "gp-display-text": {
+            "target": "gprofng-display-text",
+            "type": "symlink"
+          },
+          "ld": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "ld.bfd": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "nm": {
+            "target": "nm",
+            "type": "hardlink"
+          },
+          "objcopy": {
+            "target": "objcopy",
+            "type": "hardlink"
+          },
+          "objdump": {
+            "target": "objdump",
+            "type": "hardlink"
+          },
+          "ranlib": {
+            "target": "ranlib",
+            "type": "hardlink"
+          },
+          "readelf": {
+            "target": "readelf",
+            "type": "hardlink"
+          },
+          "strip": {
+            "target": "strip",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-c++": {
+            "target": "x86_64-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-ga68": {
+            "target": "ga68",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gcc": {
+            "target": "x86_64-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gcc-ar": {
+            "target": "gcc-ar",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gcc-nm": {
+            "target": "gcc-nm",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gccgo": {
+            "target": "gccgo",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gcobol": {
+            "target": "gcobol",
+            "type": "hardlink"
+          },
+          "x86_64-linux-gnu-gfortran": {
+            "target": "gfortran",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [
+          "ar",
+          "as",
+          "ld"
+        ],
+        "clang_version": null,
+        "gcc_targets": [
+          "x86_64-linux-gnu"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": "libgo.so.25",
+        "multilib": [
+          "lib32",
+          "lib64",
+          "libx32"
+        ],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libgcc_s.so.1",
+          "libgo.so.25",
+          "libm.so.6",
+          "libstdc++.so.6"
+        ],
+        "root": {
+          "dot_prefix": true,
+          "nested": null,
+          "strip": 1,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "x86-64",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 62
+      },
+      "asset": "gcc-17-trunk20261128.tar.xz",
+      "date": "20261128",
+      "etag": "\"a15c51c3098f4af8d7141bcbc5d832c1-49\"",
+      "family": "gcc-trunk",
+      "key": "opt/gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "7d0c714052b32f7b659975cf5daf973014af155b166eac2ed955cb1770964909",
+      "size": 405036788
     },
     "gcc-vax--netbsdelf-10.5.0-2023-11-16.tar.xz": {
       "analysis": {
@@ -33582,146 +33678,6 @@
       "sha256": "ea5991ae6a39c07cc60760270fa31d23bc948cf6c62c43547d6be681a54256c1",
       "size": 139097120
     },
-    "powerpc64-gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "powerpc64-unknown-linux-gnu-addr2line",
-          "powerpc64-unknown-linux-gnu-c++filt",
-          "powerpc64-unknown-linux-gnu-cpp",
-          "powerpc64-unknown-linux-gnu-elfedit",
-          "powerpc64-unknown-linux-gnu-embedspu",
-          "powerpc64-unknown-linux-gnu-g++",
-          "powerpc64-unknown-linux-gnu-gcc",
-          "powerpc64-unknown-linux-gnu-gcc-ar",
-          "powerpc64-unknown-linux-gnu-gcc-nm",
-          "powerpc64-unknown-linux-gnu-gcc-ranlib",
-          "powerpc64-unknown-linux-gnu-gccgo",
-          "powerpc64-unknown-linux-gnu-gcov",
-          "powerpc64-unknown-linux-gnu-gcov-dump",
-          "powerpc64-unknown-linux-gnu-gcov-tool",
-          "powerpc64-unknown-linux-gnu-gdc",
-          "powerpc64-unknown-linux-gnu-gfortran",
-          "powerpc64-unknown-linux-gnu-gnat",
-          "powerpc64-unknown-linux-gnu-gnatbind",
-          "powerpc64-unknown-linux-gnu-gnatchop",
-          "powerpc64-unknown-linux-gnu-gnatclean",
-          "powerpc64-unknown-linux-gnu-gnatkr",
-          "powerpc64-unknown-linux-gnu-gnatlink",
-          "powerpc64-unknown-linux-gnu-gnatls",
-          "powerpc64-unknown-linux-gnu-gnatmake",
-          "powerpc64-unknown-linux-gnu-gnatname",
-          "powerpc64-unknown-linux-gnu-gnatprep",
-          "powerpc64-unknown-linux-gnu-gprof",
-          "powerpc64-unknown-linux-gnu-ldd",
-          "powerpc64-unknown-linux-gnu-lto-dump",
-          "powerpc64-unknown-linux-gnu-populate",
-          "powerpc64-unknown-linux-gnu-size",
-          "powerpc64-unknown-linux-gnu-strings"
-        ],
-        "bin_links": {
-          "powerpc64-unknown-linux-gnu-ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-c++": {
-            "target": "powerpc64-unknown-linux-gnu-g++",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-cc": {
-            "target": "powerpc64-unknown-linux-gnu-gcc",
-            "type": "symlink"
-          },
-          "powerpc64-unknown-linux-gnu-gcc-17.0.0": {
-            "target": "powerpc64-unknown-linux-gnu-gcc",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "powerpc64-unknown-linux-gnu-strip": {
-            "target": "strip",
-            "type": "hardlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": null,
-        "gcc_targets": [
-          "powerpc64-unknown-linux-gnu"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "powerpc64",
-        "host_emachine": 21,
-        "libgo_soname": "libgo.so.25",
-        "multilib": [
-          "lib64"
-        ],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libc.so.6",
-          "libfl.so.2",
-          "libm.so.6"
-        ],
-        "root": {
-          "dot_prefix": false,
-          "nested": "powerpc64-unknown-linux-gnu",
-          "strip": 2,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "powerpc64",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 21
-      },
-      "asset": "gcc-17-trunk20261114-powerpc64-linux-gnu.tar.xz",
-      "date": "20261114",
-      "etag": "\"94ff9ee41338c696c647eb2bcc7661f2-33\"",
-      "family": "powerpc64-gcc-trunk",
-      "key": "opt/powerpc64-gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "6ddb3062d6aca0c7a86a7035289065e9e875e1239fbf34b590afe21a34a688ee",
-      "size": 273676676
-    },
     "powerpc64-gcc-trunk-20261115.tar.xz": {
       "analysis": {
         "bin": [
@@ -35245,6 +35201,146 @@
       "sha256": "09a125be3b2308a34382dd93a659a8fcb1ea1fac2a6cfd5467dc368da3ebdcd8",
       "size": 275697048
     },
+    "powerpc64-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "powerpc64-unknown-linux-gnu-addr2line",
+          "powerpc64-unknown-linux-gnu-c++",
+          "powerpc64-unknown-linux-gnu-c++filt",
+          "powerpc64-unknown-linux-gnu-cpp",
+          "powerpc64-unknown-linux-gnu-elfedit",
+          "powerpc64-unknown-linux-gnu-embedspu",
+          "powerpc64-unknown-linux-gnu-gcc-17.0.0",
+          "powerpc64-unknown-linux-gnu-gcc-ar",
+          "powerpc64-unknown-linux-gnu-gcc-nm",
+          "powerpc64-unknown-linux-gnu-gcc-ranlib",
+          "powerpc64-unknown-linux-gnu-gccgo",
+          "powerpc64-unknown-linux-gnu-gcov",
+          "powerpc64-unknown-linux-gnu-gcov-dump",
+          "powerpc64-unknown-linux-gnu-gcov-tool",
+          "powerpc64-unknown-linux-gnu-gdc",
+          "powerpc64-unknown-linux-gnu-gfortran",
+          "powerpc64-unknown-linux-gnu-gnat",
+          "powerpc64-unknown-linux-gnu-gnatbind",
+          "powerpc64-unknown-linux-gnu-gnatchop",
+          "powerpc64-unknown-linux-gnu-gnatclean",
+          "powerpc64-unknown-linux-gnu-gnatkr",
+          "powerpc64-unknown-linux-gnu-gnatlink",
+          "powerpc64-unknown-linux-gnu-gnatls",
+          "powerpc64-unknown-linux-gnu-gnatmake",
+          "powerpc64-unknown-linux-gnu-gnatname",
+          "powerpc64-unknown-linux-gnu-gnatprep",
+          "powerpc64-unknown-linux-gnu-gprof",
+          "powerpc64-unknown-linux-gnu-ldd",
+          "powerpc64-unknown-linux-gnu-lto-dump",
+          "powerpc64-unknown-linux-gnu-populate",
+          "powerpc64-unknown-linux-gnu-size",
+          "powerpc64-unknown-linux-gnu-strings"
+        ],
+        "bin_links": {
+          "powerpc64-unknown-linux-gnu-ar": {
+            "target": "ar",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-as": {
+            "target": "as",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-cc": {
+            "target": "powerpc64-unknown-linux-gnu-gcc",
+            "type": "symlink"
+          },
+          "powerpc64-unknown-linux-gnu-g++": {
+            "target": "powerpc64-unknown-linux-gnu-c++",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-gcc": {
+            "target": "powerpc64-unknown-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-ld": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-ld.bfd": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-nm": {
+            "target": "nm",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-objcopy": {
+            "target": "objcopy",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-objdump": {
+            "target": "objdump",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-ranlib": {
+            "target": "ranlib",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-readelf": {
+            "target": "readelf",
+            "type": "hardlink"
+          },
+          "powerpc64-unknown-linux-gnu-strip": {
+            "target": "strip",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "powerpc64-unknown-linux-gnu"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": "libgo.so.25",
+        "multilib": [
+          "lib64"
+        ],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libfl.so.2",
+          "libm.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "powerpc64-unknown-linux-gnu",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "powerpc64",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 21
+      },
+      "asset": "gcc-17-trunk20261128-powerpc64-linux-gnu.tar.xz",
+      "date": "20261128",
+      "etag": "\"966f34e6c6414379a8a21b4417cf9129-33\"",
+      "family": "powerpc64-gcc-trunk",
+      "key": "opt/powerpc64-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "e44f2876e7586425a2404a19741a62f23b2b419f61177bf1f4127048a0aec221",
+      "size": 275611852
+    },
     "powerpc64le-gcc-11.2.0.tar.xz": {
       "analysis": {
         "bin": [
@@ -36321,146 +36417,6 @@
       "kind": "stable",
       "sha256": "c972658b4ae47ac1089ced7504e53bac4839c9df8e0e7cba9d67b84343a0e35e",
       "size": 142372900
-    },
-    "powerpc64le-gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "powerpc64le-unknown-linux-gnu-addr2line",
-          "powerpc64le-unknown-linux-gnu-c++",
-          "powerpc64le-unknown-linux-gnu-c++filt",
-          "powerpc64le-unknown-linux-gnu-cpp",
-          "powerpc64le-unknown-linux-gnu-elfedit",
-          "powerpc64le-unknown-linux-gnu-embedspu",
-          "powerpc64le-unknown-linux-gnu-gcc",
-          "powerpc64le-unknown-linux-gnu-gcc-ar",
-          "powerpc64le-unknown-linux-gnu-gcc-nm",
-          "powerpc64le-unknown-linux-gnu-gcc-ranlib",
-          "powerpc64le-unknown-linux-gnu-gccgo",
-          "powerpc64le-unknown-linux-gnu-gcov",
-          "powerpc64le-unknown-linux-gnu-gcov-dump",
-          "powerpc64le-unknown-linux-gnu-gcov-tool",
-          "powerpc64le-unknown-linux-gnu-gdc",
-          "powerpc64le-unknown-linux-gnu-gfortran",
-          "powerpc64le-unknown-linux-gnu-gnat",
-          "powerpc64le-unknown-linux-gnu-gnatbind",
-          "powerpc64le-unknown-linux-gnu-gnatchop",
-          "powerpc64le-unknown-linux-gnu-gnatclean",
-          "powerpc64le-unknown-linux-gnu-gnatkr",
-          "powerpc64le-unknown-linux-gnu-gnatlink",
-          "powerpc64le-unknown-linux-gnu-gnatls",
-          "powerpc64le-unknown-linux-gnu-gnatmake",
-          "powerpc64le-unknown-linux-gnu-gnatname",
-          "powerpc64le-unknown-linux-gnu-gnatprep",
-          "powerpc64le-unknown-linux-gnu-gprof",
-          "powerpc64le-unknown-linux-gnu-ldd",
-          "powerpc64le-unknown-linux-gnu-lto-dump",
-          "powerpc64le-unknown-linux-gnu-populate",
-          "powerpc64le-unknown-linux-gnu-size",
-          "powerpc64le-unknown-linux-gnu-strings"
-        ],
-        "bin_links": {
-          "powerpc64le-unknown-linux-gnu-ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-cc": {
-            "target": "powerpc64le-unknown-linux-gnu-gcc",
-            "type": "symlink"
-          },
-          "powerpc64le-unknown-linux-gnu-g++": {
-            "target": "powerpc64le-unknown-linux-gnu-c++",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-gcc-17.0.0": {
-            "target": "powerpc64le-unknown-linux-gnu-gcc",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "powerpc64le-unknown-linux-gnu-strip": {
-            "target": "strip",
-            "type": "hardlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": null,
-        "gcc_targets": [
-          "powerpc64le-unknown-linux-gnu"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "powerpc64",
-        "host_emachine": 21,
-        "libgo_soname": "libgo.so.25",
-        "multilib": [
-          "lib64"
-        ],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libc.so.6",
-          "libfl.so.2",
-          "libm.so.6"
-        ],
-        "root": {
-          "dot_prefix": false,
-          "nested": "powerpc64le-unknown-linux-gnu",
-          "strip": 2,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "powerpc64",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 21
-      },
-      "asset": "gcc-17-trunk20261114-powerpc64le-linux-gnu.tar.xz",
-      "date": "20261114",
-      "etag": "\"3f8fb500a0501ad4108b41e3233e2d8e-34\"",
-      "family": "powerpc64le-gcc-trunk",
-      "key": "opt/powerpc64le-gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "5974b0ec6e7c67334f4dacb5502fb13c6bcad01bba1d77ae282a62e7a2c0286b",
-      "size": 277949560
     },
     "powerpc64le-gcc-trunk-20261115.tar.xz": {
       "analysis": {
@@ -37958,6 +37914,119 @@
       "sha256": "252692f382a09534ff0979b619adef7305a1aaecc33ff9ab4f39c654d1e63a41",
       "size": 282347652
     },
+    "powerpc64le-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "powerpc64le-unknown-linux-gnu-addr2line",
+          "powerpc64le-unknown-linux-gnu-ar",
+          "powerpc64le-unknown-linux-gnu-as",
+          "powerpc64le-unknown-linux-gnu-c++",
+          "powerpc64le-unknown-linux-gnu-c++filt",
+          "powerpc64le-unknown-linux-gnu-cpp",
+          "powerpc64le-unknown-linux-gnu-elfedit",
+          "powerpc64le-unknown-linux-gnu-embedspu",
+          "powerpc64le-unknown-linux-gnu-gcc-17.0.0",
+          "powerpc64le-unknown-linux-gnu-gcc-ar",
+          "powerpc64le-unknown-linux-gnu-gcc-nm",
+          "powerpc64le-unknown-linux-gnu-gcc-ranlib",
+          "powerpc64le-unknown-linux-gnu-gccgo",
+          "powerpc64le-unknown-linux-gnu-gcov",
+          "powerpc64le-unknown-linux-gnu-gcov-dump",
+          "powerpc64le-unknown-linux-gnu-gcov-tool",
+          "powerpc64le-unknown-linux-gnu-gdc",
+          "powerpc64le-unknown-linux-gnu-gfortran",
+          "powerpc64le-unknown-linux-gnu-gnat",
+          "powerpc64le-unknown-linux-gnu-gnatbind",
+          "powerpc64le-unknown-linux-gnu-gnatchop",
+          "powerpc64le-unknown-linux-gnu-gnatclean",
+          "powerpc64le-unknown-linux-gnu-gnatkr",
+          "powerpc64le-unknown-linux-gnu-gnatlink",
+          "powerpc64le-unknown-linux-gnu-gnatls",
+          "powerpc64le-unknown-linux-gnu-gnatmake",
+          "powerpc64le-unknown-linux-gnu-gnatname",
+          "powerpc64le-unknown-linux-gnu-gnatprep",
+          "powerpc64le-unknown-linux-gnu-gprof",
+          "powerpc64le-unknown-linux-gnu-ld",
+          "powerpc64le-unknown-linux-gnu-ldd",
+          "powerpc64le-unknown-linux-gnu-lto-dump",
+          "powerpc64le-unknown-linux-gnu-nm",
+          "powerpc64le-unknown-linux-gnu-objcopy",
+          "powerpc64le-unknown-linux-gnu-objdump",
+          "powerpc64le-unknown-linux-gnu-populate",
+          "powerpc64le-unknown-linux-gnu-ranlib",
+          "powerpc64le-unknown-linux-gnu-readelf",
+          "powerpc64le-unknown-linux-gnu-size",
+          "powerpc64le-unknown-linux-gnu-strings",
+          "powerpc64le-unknown-linux-gnu-strip"
+        ],
+        "bin_links": {
+          "powerpc64le-unknown-linux-gnu-cc": {
+            "target": "powerpc64le-unknown-linux-gnu-gcc",
+            "type": "symlink"
+          },
+          "powerpc64le-unknown-linux-gnu-g++": {
+            "target": "powerpc64le-unknown-linux-gnu-c++",
+            "type": "hardlink"
+          },
+          "powerpc64le-unknown-linux-gnu-gcc": {
+            "target": "powerpc64le-unknown-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "powerpc64le-unknown-linux-gnu-ld.bfd": {
+            "target": "powerpc64le-unknown-linux-gnu-ld",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "powerpc64le-unknown-linux-gnu"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": "libgo.so.25",
+        "multilib": [
+          "lib64"
+        ],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libfl.so.2",
+          "libm.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "powerpc64le-unknown-linux-gnu",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "powerpc64",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 21
+      },
+      "asset": "gcc-17-trunk20261128-powerpc64le-linux-gnu.tar.xz",
+      "date": "20261128",
+      "etag": "\"7f720c177e548c48355851f2933224e2-34\"",
+      "family": "powerpc64le-gcc-trunk",
+      "key": "opt/powerpc64le-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "d25c7a93ce6d239577e80f6f78f0b0cf4e8d6ceff7cfa8ccb19db59a9455edc6",
+      "size": 282215060
+    },
     "riscv32-gcc-10.3.0.tar.xz": {
       "analysis": {
         "bin": [
@@ -39002,132 +39071,6 @@
       "kind": "stable",
       "sha256": "479a35b3cbbeecb166c126ea263277ffa713e691818a668432178158823a12e1",
       "size": 45158812
-    },
-    "riscv32-gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "riscv32-unknown-linux-gnu-addr2line",
-          "riscv32-unknown-linux-gnu-c++filt",
-          "riscv32-unknown-linux-gnu-cpp",
-          "riscv32-unknown-linux-gnu-elfedit",
-          "riscv32-unknown-linux-gnu-g++",
-          "riscv32-unknown-linux-gnu-gcc-17.0.0",
-          "riscv32-unknown-linux-gnu-gcc-ar",
-          "riscv32-unknown-linux-gnu-gcc-nm",
-          "riscv32-unknown-linux-gnu-gcc-ranlib",
-          "riscv32-unknown-linux-gnu-gcov",
-          "riscv32-unknown-linux-gnu-gcov-dump",
-          "riscv32-unknown-linux-gnu-gcov-tool",
-          "riscv32-unknown-linux-gnu-gdc",
-          "riscv32-unknown-linux-gnu-gfortran",
-          "riscv32-unknown-linux-gnu-gprof",
-          "riscv32-unknown-linux-gnu-ldd",
-          "riscv32-unknown-linux-gnu-lto-dump",
-          "riscv32-unknown-linux-gnu-populate",
-          "riscv32-unknown-linux-gnu-size",
-          "riscv32-unknown-linux-gnu-strings"
-        ],
-        "bin_links": {
-          "riscv32-unknown-linux-gnu-ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-c++": {
-            "target": "riscv32-unknown-linux-gnu-g++",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-cc": {
-            "target": "riscv32-unknown-linux-gnu-gcc",
-            "type": "symlink"
-          },
-          "riscv32-unknown-linux-gnu-gcc": {
-            "target": "riscv32-unknown-linux-gnu-gcc-17.0.0",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "riscv32-unknown-linux-gnu-strip": {
-            "target": "strip",
-            "type": "hardlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": null,
-        "gcc_targets": [
-          "riscv32-unknown-linux-gnu"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "riscv",
-        "host_emachine": 243,
-        "libgo_soname": null,
-        "multilib": [],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libc.so.6",
-          "libfl.so.2",
-          "libm.so.6"
-        ],
-        "root": {
-          "dot_prefix": false,
-          "nested": "riscv32-unknown-linux-gnu",
-          "strip": 2,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "riscv",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 243
-      },
-      "asset": "gcc-17-trunk20261114-riscv32.tar.xz",
-      "date": "20261114",
-      "etag": "\"3e1ba775fd50ddd08a2d4cb8b3b2052e-29\"",
-      "family": "riscv32-gcc-trunk",
-      "key": "opt/riscv32-gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "57301adae409325d97fe9f430a9be15bb144d9b1b26c60a189b0e66ee7eee0d7",
-      "size": 242109884
     },
     "riscv32-gcc-trunk-20261115.tar.xz": {
       "analysis": {
@@ -40767,6 +40710,132 @@
       "sha256": "60bae9838eec92abe696ed1374be9c7c7431965b43694e47ea9ae916a708faf4",
       "size": 245006960
     },
+    "riscv32-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "riscv32-unknown-linux-gnu-addr2line",
+          "riscv32-unknown-linux-gnu-c++filt",
+          "riscv32-unknown-linux-gnu-cpp",
+          "riscv32-unknown-linux-gnu-elfedit",
+          "riscv32-unknown-linux-gnu-g++",
+          "riscv32-unknown-linux-gnu-gcc-17.0.0",
+          "riscv32-unknown-linux-gnu-gcc-ar",
+          "riscv32-unknown-linux-gnu-gcc-nm",
+          "riscv32-unknown-linux-gnu-gcc-ranlib",
+          "riscv32-unknown-linux-gnu-gcov",
+          "riscv32-unknown-linux-gnu-gcov-dump",
+          "riscv32-unknown-linux-gnu-gcov-tool",
+          "riscv32-unknown-linux-gnu-gdc",
+          "riscv32-unknown-linux-gnu-gfortran",
+          "riscv32-unknown-linux-gnu-gprof",
+          "riscv32-unknown-linux-gnu-ldd",
+          "riscv32-unknown-linux-gnu-lto-dump",
+          "riscv32-unknown-linux-gnu-populate",
+          "riscv32-unknown-linux-gnu-size",
+          "riscv32-unknown-linux-gnu-strings"
+        ],
+        "bin_links": {
+          "riscv32-unknown-linux-gnu-ar": {
+            "target": "ar",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-as": {
+            "target": "as",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-c++": {
+            "target": "riscv32-unknown-linux-gnu-g++",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-cc": {
+            "target": "riscv32-unknown-linux-gnu-gcc",
+            "type": "symlink"
+          },
+          "riscv32-unknown-linux-gnu-gcc": {
+            "target": "riscv32-unknown-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-ld": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-ld.bfd": {
+            "target": "ld",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-nm": {
+            "target": "nm",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-objcopy": {
+            "target": "objcopy",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-objdump": {
+            "target": "objdump",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-ranlib": {
+            "target": "ranlib",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-readelf": {
+            "target": "readelf",
+            "type": "hardlink"
+          },
+          "riscv32-unknown-linux-gnu-strip": {
+            "target": "strip",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "riscv32-unknown-linux-gnu"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": null,
+        "multilib": [],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libfl.so.2",
+          "libm.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "riscv32-unknown-linux-gnu",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "riscv",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 243
+      },
+      "asset": "gcc-17-trunk20261128-riscv32.tar.xz",
+      "date": "20261128",
+      "etag": "\"25a483b91ada009c57ca23d40f13df41-30\"",
+      "family": "riscv32-gcc-trunk",
+      "key": "opt/riscv32-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "bbcd12a9947c9efb0fee15be715b2441e5de13a5a1eb98cca3c50546476c9985",
+      "size": 244850372
+    },
     "riscv64-gcc-10.3.0.tar.xz": {
       "analysis": {
         "bin": [
@@ -41888,133 +41957,6 @@
       "kind": "stable",
       "sha256": "4657eeab5c04ef98b3bd16586f56cb25c8b7da3c02e66baec06555d2ebed1519",
       "size": 67428908
-    },
-    "riscv64-gcc-trunk-20261114.tar.xz": {
-      "analysis": {
-        "bin": [
-          "riscv64-unknown-linux-gnu-addr2line",
-          "riscv64-unknown-linux-gnu-c++filt",
-          "riscv64-unknown-linux-gnu-cpp",
-          "riscv64-unknown-linux-gnu-elfedit",
-          "riscv64-unknown-linux-gnu-g++",
-          "riscv64-unknown-linux-gnu-gcc",
-          "riscv64-unknown-linux-gnu-gcc-ar",
-          "riscv64-unknown-linux-gnu-gcc-nm",
-          "riscv64-unknown-linux-gnu-gcc-ranlib",
-          "riscv64-unknown-linux-gnu-gccgo",
-          "riscv64-unknown-linux-gnu-gcov",
-          "riscv64-unknown-linux-gnu-gcov-dump",
-          "riscv64-unknown-linux-gnu-gcov-tool",
-          "riscv64-unknown-linux-gnu-gdc",
-          "riscv64-unknown-linux-gnu-gfortran",
-          "riscv64-unknown-linux-gnu-gprof",
-          "riscv64-unknown-linux-gnu-ldd",
-          "riscv64-unknown-linux-gnu-lto-dump",
-          "riscv64-unknown-linux-gnu-populate",
-          "riscv64-unknown-linux-gnu-size",
-          "riscv64-unknown-linux-gnu-strings"
-        ],
-        "bin_links": {
-          "riscv64-unknown-linux-gnu-ar": {
-            "target": "ar",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-as": {
-            "target": "as",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-c++": {
-            "target": "riscv64-unknown-linux-gnu-g++",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-cc": {
-            "target": "riscv64-unknown-linux-gnu-gcc",
-            "type": "symlink"
-          },
-          "riscv64-unknown-linux-gnu-gcc-17.0.0": {
-            "target": "riscv64-unknown-linux-gnu-gcc",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-ld": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-ld.bfd": {
-            "target": "ld.bfd",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-nm": {
-            "target": "nm",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-objcopy": {
-            "target": "objcopy",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-objdump": {
-            "target": "objdump",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-ranlib": {
-            "target": "ranlib",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-readelf": {
-            "target": "readelf",
-            "type": "hardlink"
-          },
-          "riscv64-unknown-linux-gnu-strip": {
-            "target": "strip",
-            "type": "hardlink"
-          }
-        },
-        "binutils_in_bin": [],
-        "clang_version": null,
-        "gcc_targets": [
-          "riscv64-unknown-linux-gnu"
-        ],
-        "gcc_version": "17.0.0",
-        "has_binutils": true,
-        "host_arch": "riscv",
-        "host_emachine": 243,
-        "libgo_soname": "libgo.so.25",
-        "multilib": [],
-        "needed": [
-          "ld-linux-x86-64.so.2",
-          "libc.so.6",
-          "libfl.so.2",
-          "libm.so.6"
-        ],
-        "root": {
-          "dot_prefix": false,
-          "nested": "riscv64-unknown-linux-gnu",
-          "strip": 2,
-          "top": "gcc-trunk-20261114"
-        },
-        "target_arch": "riscv",
-        "target_bin": [
-          "ar",
-          "as",
-          "ld",
-          "ld.bfd",
-          "nm",
-          "objcopy",
-          "objdump",
-          "ranlib",
-          "readelf",
-          "strip"
-        ],
-        "target_emachine": 243
-      },
-      "asset": "riscv64-gcc-17-trunk20261114.tar.xz",
-      "date": "20261114",
-      "etag": "\"b4a85fb669c8d15af68738647b95eb33-37\"",
-      "family": "riscv64-gcc-trunk",
-      "key": "opt/riscv64-gcc-trunk-20261114.tar.xz",
-      "kind": "trunk",
-      "major": 17,
-      "sha256": "a86cdca4959278b27e51686edeada7a5dd35e177f6905ad9f35a5efeebd068c6",
-      "size": 308770156
     },
     "riscv64-gcc-trunk-20261115.tar.xz": {
       "analysis": {
@@ -43639,6 +43581,106 @@
       "major": 17,
       "sha256": "c2f1ba078ab5ef3c86a888beb677bbdd908486b46304877ec4a4e8a5eaf23e94",
       "size": 311213676
+    },
+    "riscv64-gcc-trunk-20261128.tar.xz": {
+      "analysis": {
+        "bin": [
+          "riscv64-unknown-linux-gnu-addr2line",
+          "riscv64-unknown-linux-gnu-ar",
+          "riscv64-unknown-linux-gnu-as",
+          "riscv64-unknown-linux-gnu-c++",
+          "riscv64-unknown-linux-gnu-c++filt",
+          "riscv64-unknown-linux-gnu-cpp",
+          "riscv64-unknown-linux-gnu-elfedit",
+          "riscv64-unknown-linux-gnu-gcc-17.0.0",
+          "riscv64-unknown-linux-gnu-gcc-ar",
+          "riscv64-unknown-linux-gnu-gcc-nm",
+          "riscv64-unknown-linux-gnu-gcc-ranlib",
+          "riscv64-unknown-linux-gnu-gccgo",
+          "riscv64-unknown-linux-gnu-gcov",
+          "riscv64-unknown-linux-gnu-gcov-dump",
+          "riscv64-unknown-linux-gnu-gcov-tool",
+          "riscv64-unknown-linux-gnu-gdc",
+          "riscv64-unknown-linux-gnu-gfortran",
+          "riscv64-unknown-linux-gnu-gprof",
+          "riscv64-unknown-linux-gnu-ld.bfd",
+          "riscv64-unknown-linux-gnu-ldd",
+          "riscv64-unknown-linux-gnu-lto-dump",
+          "riscv64-unknown-linux-gnu-nm",
+          "riscv64-unknown-linux-gnu-objcopy",
+          "riscv64-unknown-linux-gnu-objdump",
+          "riscv64-unknown-linux-gnu-populate",
+          "riscv64-unknown-linux-gnu-ranlib",
+          "riscv64-unknown-linux-gnu-readelf",
+          "riscv64-unknown-linux-gnu-size",
+          "riscv64-unknown-linux-gnu-strings",
+          "riscv64-unknown-linux-gnu-strip"
+        ],
+        "bin_links": {
+          "riscv64-unknown-linux-gnu-cc": {
+            "target": "riscv64-unknown-linux-gnu-gcc",
+            "type": "symlink"
+          },
+          "riscv64-unknown-linux-gnu-g++": {
+            "target": "riscv64-unknown-linux-gnu-c++",
+            "type": "hardlink"
+          },
+          "riscv64-unknown-linux-gnu-gcc": {
+            "target": "riscv64-unknown-linux-gnu-gcc-17.0.0",
+            "type": "hardlink"
+          },
+          "riscv64-unknown-linux-gnu-ld": {
+            "target": "riscv64-unknown-linux-gnu-ld.bfd",
+            "type": "hardlink"
+          }
+        },
+        "binutils_in_bin": [],
+        "clang_version": null,
+        "gcc_targets": [
+          "riscv64-unknown-linux-gnu"
+        ],
+        "gcc_version": "17.0.0",
+        "has_binutils": true,
+        "host_arch": "x86-64",
+        "host_emachine": 62,
+        "libgo_soname": "libgo.so.25",
+        "multilib": [],
+        "needed": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libfl.so.2",
+          "libm.so.6"
+        ],
+        "root": {
+          "dot_prefix": false,
+          "nested": "riscv64-unknown-linux-gnu",
+          "strip": 2,
+          "top": "gcc-trunk-20261128"
+        },
+        "target_arch": "riscv",
+        "target_bin": [
+          "ar",
+          "as",
+          "ld",
+          "ld.bfd",
+          "nm",
+          "objcopy",
+          "objdump",
+          "ranlib",
+          "readelf",
+          "strip"
+        ],
+        "target_emachine": 243
+      },
+      "asset": "riscv64-gcc-17-trunk20261128.tar.xz",
+      "date": "20261128",
+      "etag": "\"f1050eed7c12f1a8496d95f9ca021257-38\"",
+      "family": "riscv64-gcc-trunk",
+      "key": "opt/riscv64-gcc-trunk-20261128.tar.xz",
+      "kind": "trunk",
+      "major": 17,
+      "sha256": "e6cc3fcb010b10b7723bf1811987a336ceb5317276657c435d06b85c68a4b052",
+      "size": 311018356
     },
     "s390x-gcc-11.2.0.tar.xz": {
       "analysis": {
